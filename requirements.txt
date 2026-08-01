@@ -1,5 +1,16 @@
-pymupdf>=1.24
-pytesseract>=0.3
-pillow>=10
-python-docx>=1.1
-pytest>=8
+# CrossDoc-LegalAI Part 8 direct dependencies
+# This orchestration/reproducibility module intentionally uses only the Python standard library.
+
+# Test dependency for this part
+pytest==8.3.4
+
+# -----------------------------------------------------------------------------
+# Checklist for the final combined environment (owned/pinned by other modules):
+# - pdf parsing: pymupdf, pdfplumber, pypdf
+# - OCR: pytesseract, pillow, pdf2image
+# - DOCX parsing: python-docx
+# - embeddings/vector search: sentence-transformers, faiss-cpu, numpy
+# - LLM SDKs: openai, anthropic
+# - plotting/reporting: matplotlib, seaborn, pandas
+# - statistics/evaluation: scipy, scikit-learn, statsmodels
+# -----------------------------------------------------------------------------
