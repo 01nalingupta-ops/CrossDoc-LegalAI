@@ -1,0 +1,34 @@
+{
+  "doc_id": "master-fixture",
+  "doc_type": "master",
+  "source_path": "fixtures/master.pdf",
+  "full_text": "Payment terms are net thirty days after invoice. Confidential information must not be disclosed. Either party may terminate for uncured material breach.",
+  "page_count": 1,
+  "extraction_method": "digital",
+  "chunks": [
+    {
+      "chunk_id": "master-chunk-payment",
+      "text": "Payment terms require invoices to be paid within thirty days and late fees may apply.",
+      "char_start": 0,
+      "char_end": 82,
+      "page_num": 1,
+      "overlap_chars": 150
+    },
+    {
+      "chunk_id": "master-chunk-confidentiality",
+      "text": "Confidential information, trade secrets, and nonpublic data must be protected from disclosure.",
+      "char_start": 83,
+      "char_end": 171,
+      "page_num": 1,
+      "overlap_chars": 150
+    },
+    {
+      "chunk_id": "master-chunk-termination",
+      "text": "Termination is permitted if a party commits a material breach and fails to cure it.",
+      "char_start": 172,
+      "char_end": 250,
+      "page_num": 1,
+      "overlap_chars": 150
+    }
+  ]
+}
