@@ -1,0 +1,9 @@
+Fictional Delta Master Services Agreement
+[payment_terms] Payment Terms: Buyer will pay undisputed amounts within sixty (60) days after receiving a proper invoice.
+[liability_cap] Liability Cap: Total liability is limited to amounts paid under the applicable order, except for fraud and confidentiality breaches.
+[ip_ownership] IP Ownership: Buyer owns newly created deliverables, while Supplier retains background technology.
+[termination_notice] Termination Notice: Convenience termination requires forty-five (45) days' prior written notice.
+[governing_jurisdiction] Governing Jurisdiction: Washington law governs, with exclusive venue in King County, Washington.
+[confidentiality_scope] Confidentiality Scope: Each party must protect the other's confidential information for five (5) years after disclosure.
+[indemnification] Indemnification: Supplier indemnifies Buyer for IP infringement, and each party indemnifies the other for its negligence.
+[insurance_requirements] Insurance Requirements: Supplier must maintain $3,000,000 in aggregate liability coverage and provide certificates upon request.

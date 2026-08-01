@@ -1,0 +1,9 @@
+Fictional Gamma Master Services Agreement
+[payment_terms] Payment Terms: Company will pay approved invoices net thirty (30) days from invoice date.
+[liability_cap] Liability Cap: Except for excluded claims, neither party is liable above the fees paid for the services giving rise to the claim.
+[ip_ownership] IP Ownership: Client owns final reports, specifications, and custom materials prepared for Client.
+[termination_notice] Termination Notice: Either party may terminate without cause upon ninety (90) days' advance written notice.
+[governing_jurisdiction] Governing Jurisdiction: Illinois law governs this agreement, and venue lies in Cook County, Illinois.
+[confidentiality_scope] Confidentiality Scope: Confidentiality is reciprocal and survives for three (3) years after termination.
+[indemnification] Indemnification: Vendor and Client each indemnify the other for third-party claims arising from their wrongful acts.
+[insurance_requirements] Insurance Requirements: Vendor will maintain $1,500,000 in commercial general liability coverage and statutory workers' compensation.

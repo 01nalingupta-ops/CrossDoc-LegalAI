@@ -1,0 +1,9 @@
+Fictional Gamma Statement of Work
+[payment_terms] Payment Terms: Time-and-materials charges are billed monthly and paid under the master agreement.
+[liability_cap] Liability Cap: Claims under this SOW remain subject to the master agreement liability cap.
+[ip_ownership] IP Ownership: Deliverable ownership is allocated as described in the master agreement.
+[termination_notice] Termination Notice: Termination of this SOW requires the notice stated in the master agreement.
+[governing_jurisdiction] Governing Jurisdiction: The master agreement controls governing law and forum for this SOW.
+[confidentiality_scope] Confidentiality Scope: Confidentiality restrictions and survival periods follow the master agreement.
+[indemnification] Indemnification: The indemnification section of the master agreement applies to this SOW.
+[insurance_requirements] Insurance Requirements: Insurance coverage must meet the master agreement requirements.

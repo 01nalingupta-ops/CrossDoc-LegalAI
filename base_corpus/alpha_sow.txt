@@ -1,0 +1,9 @@
+Fictional Alpha Statement of Work
+[payment_terms] Payment Terms: Fees under this SOW are invoiced monthly and paid according to the master agreement payment period.
+[liability_cap] Liability Cap: Liability for services under this SOW follows the cap stated in the master agreement.
+[ip_ownership] IP Ownership: Ownership of deliverables under this SOW follows the master agreement.
+[termination_notice] Termination Notice: Termination rights and notice periods follow the master agreement.
+[governing_jurisdiction] Governing Jurisdiction: Governing law and venue follow the master agreement.
+[confidentiality_scope] Confidentiality Scope: Confidentiality duties for this SOW follow the master agreement.
+[indemnification] Indemnification: Indemnification duties for this SOW follow the master agreement.
+[insurance_requirements] Insurance Requirements: Insurance obligations for this SOW follow the master agreement.

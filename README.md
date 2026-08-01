@@ -126,3 +126,70 @@ retrieval_results = retrieve_for_service_doc(index, service_doc)
 ```
 
 The default embedder is fixed to the sentence-transformers model `all-MiniLM-L6-v2`. Master chunk embeddings are computed once and cached inside the index; Service chunks are embedded in a single batch per retrieval call.
+
+# CrossDoc-LegalAI Part 3: Synthetic Dataset Generator
+
+`generate_data.py` creates a synthetic adversarial benchmark dataset from fictional MSA/SOW template pairs in `base_corpus/`. It produces clean pairs and single-contradiction pairs only; it does not perform retrieval, auditing, guardrails, or evaluation.
+
+## Dataset generator CLI
+
+```bash
+python generate_data.py --corpus-dir base_corpus/ --num-pairs 60 --master-seed 42 --out benchmark_dataset.json
+```
+
+The command also writes `dataset_generation_seeds.json` beside the dataset output.
+
+## Dataset output schema
+
+`benchmark_dataset.json` is a JSON array. Every entry has exactly this shape:
+
+```json
+{
+  "pair_id": "string",
+  "seed": "integer",
+  "master_doc_path": "string",
+  "service_doc_path": "string",
+  "has_contradiction": "boolean",
+  "contradiction_category": "Payment Terms | Liability Cap | IP Ownership | Termination Notice | Governing Jurisdiction | Confidentiality Scope | Indemnification | Insurance Requirements | null",
+  "severity": "High | Medium | Low | None",
+  "master_clause_location": {"page": "int", "char_offset": "int", "clause_id": "string"},
+  "service_clause_location": {"page": "int", "char_offset": "int", "clause_id": "string"},
+  "master_exact_text": "string, verbatim substring of the master document",
+  "service_exact_text": "string, verbatim substring of the service document",
+  "generation_model": "string",
+  "generation_timestamp": "ISO-8601 string"
+}
+```
+
+The generator validates each quote before output: `master_exact_text` and `service_exact_text` must be real substrings at or near the recorded `char_offset` in the generated documents.
+
+## Defect taxonomy
+
+The fixed supported contradiction categories are:
+
+1. Payment Terms
+2. Liability Cap
+3. IP Ownership
+4. Termination Notice
+5. Governing Jurisdiction
+6. Confidentiality Scope
+7. Indemnification
+8. Insurance Requirements
+
+Clean pairs have `has_contradiction: false`, `contradiction_category: null`, and `severity: "None"`.
+
+## Dataset seed derivation
+
+All choices are deterministic from one `master_seed`. For a per-pair decision, the generator builds the exact UTF-8 message:
+
+```text
+CrossDoc-LegalAI-dataset-v1:<master_seed>:<purpose>:<pair_index>
+```
+
+For global manifest seeds, it omits `<pair_index>`:
+
+```text
+CrossDoc-LegalAI-dataset-v1:<master_seed>:<purpose>
+```
+
+It then computes SHA-256, interprets the first 8 digest bytes as an unsigned big-endian integer, and reduces the value modulo `2_147_483_647`. Re-running with the same corpus, pair count, and `master_seed` produces byte-identical selection decisions and generated JSON.

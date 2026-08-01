@@ -1,0 +1,9 @@
+Fictional Beta Master Services Agreement
+[payment_terms] Payment Terms: Customer will pay all undisputed invoices within forty-five (45) days of receipt.
+[liability_cap] Liability Cap: Vendor's total liability will not exceed the contract value for the twelve months before the claim.
+[ip_ownership] IP Ownership: Customer receives ownership of project-specific work product after payment; Vendor keeps pre-existing tools.
+[termination_notice] Termination Notice: Termination for convenience requires at least thirty (30) days' written notice.
+[governing_jurisdiction] Governing Jurisdiction: This agreement is governed by Colorado law and courts located in Denver, Colorado.
+[confidentiality_scope] Confidentiality Scope: Both parties must protect confidential information, and duties survive for four (4) years.
+[indemnification] Indemnification: The parties provide mutual indemnification for bodily injury, property damage, and infringement claims.
+[insurance_requirements] Insurance Requirements: Vendor must carry $2,000,000 in general liability and professional liability coverage.
