@@ -517,3 +517,54 @@ pytest -q tests/test_report_export.py
 ```
 
 The tests run a full export against a 4-model mock `evaluation_results.json`, assert that every required figure/table/caption file exists, verify all filenames contain the seed/hash linkage, and confirm the optional ROC-points path does not raise.
+
+# CrossDoc-LegalAI Part 7: Streamlit Comparison App
+
+`app.py` implements the standalone "Master vs. Service Document" comparison UI. It is runnable with offline stubs by default and requires no API keys. The UI is intentionally separated from `pipeline_stubs.py`, which owns the three contract-compatible integration functions that can be swapped for production modules later.
+
+## Run the app
+
+```bash
+streamlit run app.py
+```
+
+Use the included fictional sample PDFs for an immediate demo:
+
+- `sample_docs/sample_master_msa.pdf`
+- `sample_docs/sample_service_sow.pdf`
+
+Upload the Master PDF on the left, upload the Service/SOW PDF on the right, and click **Compare documents**.
+
+## Stubbed integration contracts
+
+The app imports these three functions from `pipeline_stubs.py`:
+
+```python
+parse_document(file, doc_type: str) -> dict
+retrieve_matches(master_doc: dict, service_doc: dict) -> list[dict]
+run_auditor_and_guardrail(
+    retrieval_results: list[dict],
+    master_full_text: str,
+    service_full_text: str,
+    pair_id: str = "demo-pair",
+    model_id: str = "stub-rule-auditor-v1",
+) -> list[dict]
+```
+
+`INTEGRATION.md` documents the exact schemas and the one-line import swap needed to replace these stubs with real ingestion, retrieval, and auditor+guardrail modules.
+
+## UI behavior
+
+Results render as mismatch cards sorted by severity. Each card shows a category-style header, severity badge, verification badge, side-by-side Master and Service quotes, explanation, and suggested redline. If a prediction has `guardrail_action="claim_withheld"`, the UI visibly warns: "This claim could not be verified against the source text and has been withheld." The sample SOW intentionally exercises this trust-and-safety state.
+
+Users can export the full report as JSON and a simple PDF summary from the results area.
+
+## Part 7 QA and tests
+
+Manual QA steps are in `MANUAL_QA.md`.
+
+```bash
+pytest -q tests/test_part7_pipeline.py
+```
+
+The automated smoke tests parse both sample PDFs, run the stub retrieval and auditor/guardrail pipeline, assert at least one passed contradiction and one `claim_withheld` result, and verify JSON/PDF report export data can be produced.
