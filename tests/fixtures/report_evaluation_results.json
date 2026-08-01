@@ -1,0 +1,60 @@
+{
+  "per_model_metrics": {
+    "alpha": {
+      "accuracy": 0.84, "precision": 0.82, "recall": 0.86, "f1": 0.84, "faithfulness": 0.92, "auc": 0.91,
+      "confusion_matrix": {"tp": 43, "tn": 41, "fp": 9, "fn": 7},
+      "confusion_matrix_by_category": {
+        "Payment Terms": {"tp": 11, "tn": 0, "fp": 0, "fn": 1},
+        "Liability Cap": {"tp": 9, "tn": 0, "fp": 0, "fn": 2},
+        "None": {"tp": 0, "tn": 41, "fp": 9, "fn": 0}
+      },
+      "bootstrap_ci": {"accuracy": [0.76, 0.90], "f1": [0.75, 0.90], "auc": [0.85, 0.96]}
+    },
+    "beta": {
+      "accuracy": 0.79, "precision": 0.76, "recall": 0.83, "f1": 0.79, "faithfulness": 0.88, "auc": 0.87,
+      "confusion_matrix": {"tp": 39, "tn": 40, "fp": 12, "fn": 8},
+      "confusion_matrix_by_category": {
+        "Payment Terms": {"tp": 10, "tn": 0, "fp": 0, "fn": 2},
+        "Termination Notice": {"tp": 8, "tn": 0, "fp": 0, "fn": 2},
+        "None": {"tp": 0, "tn": 40, "fp": 12, "fn": 0}
+      },
+      "bootstrap_ci": {"accuracy": [0.70, 0.86], "f1": [0.69, 0.86], "auc": [0.80, 0.93]}
+    },
+    "delta": {
+      "accuracy": 0.72, "precision": 0.70, "recall": 0.74, "f1": 0.72, "faithfulness": 0.81, "auc": 0.80,
+      "confusion_matrix": {"tp": 35, "tn": 37, "fp": 15, "fn": 13},
+      "confusion_matrix_by_category": {
+        "IP Ownership": {"tp": 7, "tn": 0, "fp": 0, "fn": 4},
+        "Insurance Requirements": {"tp": 6, "tn": 0, "fp": 0, "fn": 3},
+        "None": {"tp": 0, "tn": 37, "fp": 15, "fn": 0}
+      },
+      "bootstrap_ci": {"accuracy": [0.63, 0.80], "f1": [0.61, 0.81], "auc": [0.72, 0.88]}
+    },
+    "gamma": {
+      "accuracy": 0.88, "precision": 0.90, "recall": 0.84, "f1": 0.87, "faithfulness": 0.95, "auc": 0.94,
+      "confusion_matrix": {"tp": 42, "tn": 46, "fp": 5, "fn": 8},
+      "confusion_matrix_by_category": {
+        "Payment Terms": {"tp": 12, "tn": 0, "fp": 0, "fn": 0},
+        "Liability Cap": {"tp": 10, "tn": 0, "fp": 0, "fn": 1},
+        "None": {"tp": 0, "tn": 46, "fp": 5, "fn": 0}
+      },
+      "bootstrap_ci": {"accuracy": [0.81, 0.93], "f1": [0.79, 0.92], "auc": [0.89, 0.98]}
+    }
+  },
+  "pairwise_mcnemar": {
+    "alpha__vs__beta": {"p_value": 0.0800, "p_value_holm_adjusted": 0.1600, "significant": false},
+    "alpha__vs__delta": {"p_value": 0.0100, "p_value_holm_adjusted": 0.0400, "significant": true},
+    "alpha__vs__gamma": {"p_value": 0.1200, "p_value_holm_adjusted": 0.2400, "significant": false},
+    "beta__vs__delta": {"p_value": 0.0300, "p_value_holm_adjusted": 0.0900, "significant": false},
+    "beta__vs__gamma": {"p_value": 0.0040, "p_value_holm_adjusted": 0.0240, "significant": true},
+    "delta__vs__gamma": {"p_value": 0.0010, "p_value_holm_adjusted": 0.0060, "significant": true}
+  },
+  "pairwise_delong": {
+    "alpha__vs__beta": {"p_value": 0.0900, "p_value_holm_adjusted": 0.1800, "significant": false},
+    "alpha__vs__delta": {"p_value": 0.0060, "p_value_holm_adjusted": 0.0300, "significant": true},
+    "alpha__vs__gamma": {"p_value": 0.2000, "p_value_holm_adjusted": 0.3000, "significant": false},
+    "beta__vs__delta": {"p_value": 0.0400, "p_value_holm_adjusted": 0.1200, "significant": false},
+    "beta__vs__gamma": {"p_value": 0.0120, "p_value_holm_adjusted": 0.0480, "significant": true},
+    "delta__vs__gamma": {"p_value": 0.0005, "p_value_holm_adjusted": 0.0030, "significant": true}
+  }
+}

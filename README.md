@@ -193,3 +193,327 @@ CrossDoc-LegalAI-dataset-v1:<master_seed>:<purpose>
 ```
 
 It then computes SHA-256, interprets the first 8 digest bytes as an unsigned big-endian integer, and reduces the value modulo `2_147_483_647`. Re-running with the same corpus, pair count, and `master_seed` produces byte-identical selection decisions and generated JSON.
+
+# CrossDoc-LegalAI Part 4: Auditor Agent and Zero-Hallucination Guardrail
+
+This standalone module consumes Part 2 `RetrievalResult` objects and produces one verified contradiction prediction per `(model, service_chunk)` pair. It intentionally does **not** implement retrieval, embeddings, evaluation metrics, statistics, or a UI.
+
+## Component A: Auditor Agent (LangGraph Node 2)
+
+`model_adapter.py` defines the adapter boundary used for the four-model bake-off:
+
+```python
+class AuditorModelAdapter(ABC):
+    model_id: str
+
+    def judge(self, service_chunk_text: str, master_chunks: list[dict]) -> dict:
+        ...
+```
+
+Adapters receive the Service chunk text and the list of matched Master chunks from the retrieval result. They return the raw Auditor schema:
+
+```json
+{
+  "has_contradiction": "boolean",
+  "confidence": "float 0.0-1.0",
+  "severity": "High | Medium | Low | None",
+  "conflict_explanation": "string",
+  "msa_exact_quote": "string, verbatim quote from a matched Master chunk or empty",
+  "sow_exact_quote": "string, verbatim quote from the Service chunk or empty",
+  "suggested_redline": "string, corrected Service clause or empty"
+}
+```
+
+Two adapters are included:
+
+- `MockAdapter`: deterministic, no-network test adapter used by default by the CLI.
+- `OpenAICompatibleAdapter`: generic `/chat/completions` adapter configurable with `OPENAI_COMPATIBLE_API_KEY`, `OPENAI_COMPATIBLE_BASE_URL`, and `OPENAI_COMPATIBLE_MODEL`.
+
+Every real adapter call sends `temperature=0.0`. Adding another provider should only require a small new subclass of `AuditorModelAdapter`; orchestration code should not import provider SDKs or provider-specific settings.
+
+### Fixed prompt template
+
+The prompt in `AUDITOR_PROMPT_TEMPLATE` asks the model to judge contradictions between a Service/SOW clause and matched Master/MSA clauses, considering these categories: Payment Terms, Liability Cap, IP Ownership, Termination Notice, Governing Jurisdiction, Confidentiality Scope, Indemnification, and Insurance Requirements. It requires exactly the seven raw-output keys above, requires JSON-only output, requires `severity` to be `High`, `Medium`, `Low`, or `None`, and instructs the model to use only verbatim quotes present in the provided chunks.
+
+## Component B: Deterministic Guardrail (LangGraph Node 3)
+
+`apply_guardrail(raw_prediction, master_full_text, service_full_text)` verifies quotes without an LLM:
+
+1. `msa_exact_quote` must be a substring of the full Master document after whitespace normalization.
+2. `sow_exact_quote` must be a substring of the full Service document after whitespace normalization.
+3. Empty quotes are valid for no-contradiction predictions.
+4. If both quote checks pass, the guardrail sets `guardrail_verified=true` and `guardrail_action="passed"`.
+5. If either quote check fails, the module withholds the claim by forcing `has_contradiction=false`, `confidence=0.0`, `severity="None"`, and `suggested_redline=""`, while preserving the explanation and quotes for audit/debug visibility. The guardrail sets `guardrail_verified=false` and `guardrail_action="claim_withheld"`.
+
+The final output schema is exactly:
+
+```json
+{
+  "pair_id": "string",
+  "model_id": "string",
+  "service_chunk_id": "string",
+  "has_contradiction": "boolean",
+  "confidence": "float 0.0-1.0",
+  "severity": "High | Medium | Low | None",
+  "conflict_explanation": "string",
+  "msa_exact_quote": "string",
+  "sow_exact_quote": "string",
+  "suggested_redline": "string",
+  "guardrail_verified": "boolean",
+  "guardrail_action": "passed | quote_rejected | claim_withheld"
+}
+```
+
+This implementation uses `claim_withheld` for failed verification because the claim is not safe for end users. `quote_rejected` is reserved by the shared schema for consumers that want to represent quote-only rejection separately.
+
+## Pipeline API
+
+```python
+from auditor_guardrail import run_auditor_and_guardrail
+from model_adapter import MockAdapter
+
+verified = run_auditor_and_guardrail(
+    retrieval_result=retrieval_result,
+    master_full_text=master_full_text,
+    service_full_text=service_full_text,
+    adapter=MockAdapter(),
+    pair_id="caller-context-id",
+)
+```
+
+## CLI
+
+The CLI expects a JSON object with `pair_id`, `master_full_text`, `service_full_text`, and `retrieval_results` (an array of Part 2 `RetrievalResult` objects). It uses `MockAdapter` by default and prints the verified prediction array.
+
+```bash
+python auditor_guardrail.py tests/fixtures/auditor_guardrail_fixture.json
+```
+
+## Part 4 tests
+
+```bash
+pytest -q tests/test_auditor_guardrail.py
+```
+
+The fixture file `tests/fixtures/auditor_guardrail_fixture.json` contains five hand-written retrieval results covering payment contradiction, liability contradiction, clean confidentiality, clean termination, and a hallucinated quote path that the guardrail withholds.
+
+# CrossDoc-LegalAI Part 5: Offline Evaluation Metrics
+
+`evaluation.py` is a standalone offline statistics module. It consumes reduced ground-truth records and per-model prediction records, computes model metrics and paired statistical comparisons, and writes one `evaluation_results.json` object. It does not call LLMs and does not import any other CrossDoc-LegalAI module.
+
+## Evaluation inputs
+
+Ground truth is a JSON array with one record per benchmark pair:
+
+```json
+{
+  "pair_id": "string",
+  "has_contradiction": "boolean",
+  "contradiction_category": "string or null",
+  "severity": "High | Medium | Low | None"
+}
+```
+
+Predictions are a JSON array with one record per `(model, pair)`; multiple `model_id` values may be interleaved:
+
+```json
+{
+  "pair_id": "string",
+  "model_id": "string",
+  "has_contradiction": "boolean",
+  "confidence": "float 0.0-1.0 or null",
+  "severity": "High | Medium | Low | None",
+  "guardrail_verified": "boolean"
+}
+```
+
+## Metrics and statistical tests
+
+For each model, the module computes accuracy, precision, recall, F1, faithfulness, ROC-AUC, an overall confusion matrix, confusion matrices by contradiction category, and bootstrap 95% confidence intervals for accuracy, F1, and AUC. Faithfulness is the fraction of positive model claims where `guardrail_verified=true`; models with no positive claims receive faithfulness `1.0` because there were no unsupported positive claims.
+
+ROC-AUC uses `confidence` as the ranking score. If `confidence` is missing or `null`, the evaluator falls back to an ordinal severity score: `None=0`, `Low=1`, `Medium=2`, and `High=3`. This fallback is implemented in `_prediction_score(...)` so model outputs remain evaluable even when confidence is unavailable.
+
+For every pair of model IDs present in the prediction input, the module computes:
+
+- McNemar's paired comparison from per-pair correctness. For fewer than 25 discordant pairs it uses an exact two-sided binomial test; otherwise it uses the continuity-corrected chi-squared statistic `(abs(n01 - n10) - 1)^2 / (n01 + n10)` with 1 degree of freedom.
+- DeLong's correlated ROC-AUC comparison using Mann-Whitney structural components (`V10`/`V01`) to estimate variance and covariance on the same benchmark pairs, followed by a two-sided standard-normal p-value.
+- Holm-Bonferroni correction separately across the McNemar p-value family and the DeLong p-value family at `alpha=0.05`.
+
+The generic `paired_mcnemar_comparison(predictions_a, predictions_b, ground_truth)` helper can be reused for ablations such as guardrail-on vs guardrail-off or agentic pipeline vs baseline; it is not hardcoded to bake-off `model_id` groupings.
+
+## Evaluation output schema
+
+The CLI writes exactly one JSON object:
+
+```json
+{
+  "per_model_metrics": {
+    "<model_id>": {
+      "accuracy": "float",
+      "precision": "float",
+      "recall": "float",
+      "f1": "float",
+      "faithfulness": "float",
+      "auc": "float",
+      "confusion_matrix": {"tp": "int", "tn": "int", "fp": "int", "fn": "int"},
+      "confusion_matrix_by_category": {
+        "<category>": {"tp": "int", "tn": "int", "fp": "int", "fn": "int"}
+      },
+      "bootstrap_ci": {
+        "accuracy": ["low", "high"],
+        "f1": ["low", "high"],
+        "auc": ["low", "high"]
+      }
+    }
+  },
+  "pairwise_mcnemar": {
+    "<model_a>__vs__<model_b>": {
+      "chi2_or_exact": "float",
+      "p_value": "float",
+      "p_value_holm_adjusted": "float",
+      "significant": "boolean"
+    }
+  },
+  "pairwise_delong": {
+    "<model_a>__vs__<model_b>": {
+      "z": "float",
+      "p_value": "float",
+      "p_value_holm_adjusted": "float",
+      "significant": "boolean"
+    }
+  }
+}
+```
+
+## Evaluation CLI
+
+```bash
+python evaluation.py --ground-truth tests/fixtures/evaluation_ground_truth.json \
+  --predictions tests/fixtures/evaluation_predictions.json \
+  --out evaluation_results.json
+```
+
+Optional flags:
+
+- `--bootstrap-resamples`: defaults to `1000`.
+- `--seed`: deterministic bootstrap seed, defaults to `12345`.
+
+## Part 5 tests
+
+```bash
+pytest -q tests/test_evaluation.py
+```
+
+The tests include hand-checked confusion-matrix metrics, a McNemar exact-binomial p-value, a severity-fallback AUC case, and a bootstrap CI sanity check that verifies larger samples produce narrower intervals than smaller samples with the same error rate.
+
+# CrossDoc-LegalAI Part 6: Report Exporter
+
+`report_export.py` is a presentation-only module. It consumes a completed `evaluation_results.json` object plus two caller-supplied run identifiers (`seed` and `dataset_hash`) and exports paper-ready figures, LaTeX table snippets, CSV inspection tables, and draft captions. It does **not** compute metrics or statistical tests; all numbers are trusted from the input JSON.
+
+## Report input schema
+
+The required input is one JSON object with this shape:
+
+```json
+{
+  "per_model_metrics": {
+    "<model_id>": {
+      "accuracy": "float",
+      "precision": "float",
+      "recall": "float",
+      "f1": "float",
+      "faithfulness": "float",
+      "auc": "float",
+      "confusion_matrix": {"tp": "int", "tn": "int", "fp": "int", "fn": "int"},
+      "confusion_matrix_by_category": {
+        "<category>": {"tp": "int", "tn": "int", "fp": "int", "fn": "int"}
+      },
+      "bootstrap_ci": {
+        "accuracy": ["low", "high"],
+        "f1": ["low", "high"],
+        "auc": ["low", "high"]
+      }
+    }
+  },
+  "pairwise_mcnemar": {
+    "<model_a>__vs__<model_b>": {
+      "p_value": "float",
+      "p_value_holm_adjusted": "float",
+      "significant": "boolean"
+    }
+  },
+  "pairwise_delong": {
+    "<model_a>__vs__<model_b>": {
+      "p_value": "float",
+      "p_value_holm_adjusted": "float",
+      "significant": "boolean"
+    }
+  }
+}
+```
+
+Optional ROC points can be supplied as a separate JSON file with:
+
+```json
+{"<model_id>": [{"fpr": 0.0, "tpr": 0.0}, {"fpr": 1.0, "tpr": 1.0}]}
+```
+
+When ROC points are not provided, the ROC figure gracefully falls back to an AUC bar chart and notes that the figure is based only on per-model AUC values.
+
+## Exported report artifacts
+
+For every figure, the exporter writes vector-style `pdf` and `eps` files plus a 300-DPI `png` preview. It also writes a `captions.md` file with one draft caption per figure. The required figures are:
+
+1. Grouped bar chart for accuracy, precision, recall, and F1 by model.
+2. Overlaid ROC curves, or AUC-bar fallback when raw ROC points are absent.
+3. Confusion-matrix small multiples by model.
+4. Bootstrap confidence-interval plot for accuracy, F1, and AUC.
+5. McNemar Holm-adjusted p-value heatmap with significant cells outlined.
+6. DeLong Holm-adjusted p-value heatmap with significant cells outlined.
+7. Generic two-dictionary ablation bar chart.
+8. Generic two-dictionary baseline-vs-best bar chart.
+
+The required tables are exported as both `.tex` tabular snippets and `.csv` files:
+
+- `per_model_metrics`: Accuracy, Precision, Recall, F1, AUC, and Faithfulness.
+- `mcnemar_pvalues`: pairwise Holm-adjusted McNemar p-values, with `*` on significant cells.
+- `delong_pvalues`: pairwise Holm-adjusted DeLong p-values, with `*` on significant cells.
+
+## Style and reproducibility
+
+The preferred plotting backend is Matplotlib with `DejaVu Sans` at a consistent base font size of 10, which reads cleanly in LNCS-style paper drafts. Model colors are assigned once from sorted `model_id` values and reused across all figures so each model remains visually consistent. In minimal environments where Matplotlib is unavailable, the module falls back to a small Pillow renderer so the CLI and tests still produce all required files.
+
+Every exported filename is built through `build_artifact_path(...)`, which embeds the run seed and dataset hash, for example:
+
+```text
+model_metric_bars_seed42_hashabc123.pdf
+mcnemar_pvalues_seed42_hashabc123.tex
+captions_seed42_hashabc123.md
+```
+
+## Report CLI
+
+```bash
+python report_export.py --eval-results tests/fixtures/report_evaluation_results.json \
+  --seed 42 \
+  --dataset-hash abc123 \
+  --out-dir exports/
+```
+
+Optional ROC-points input:
+
+```bash
+python report_export.py --eval-results evaluation_results.json \
+  --seed 42 \
+  --dataset-hash abc123 \
+  --out-dir exports/ \
+  --roc-points roc_points.json
+```
+
+## Part 6 tests
+
+```bash
+pytest -q tests/test_report_export.py
+```
+
+The tests run a full export against a 4-model mock `evaluation_results.json`, assert that every required figure/table/caption file exists, verify all filenames contain the seed/hash linkage, and confirm the optional ROC-points path does not raise.
