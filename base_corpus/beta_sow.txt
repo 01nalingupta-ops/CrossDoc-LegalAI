@@ -1,0 +1,9 @@
+Fictional Beta Statement of Work
+[payment_terms] Payment Terms: Project invoices are submitted at milestone completion and paid according to the master agreement.
+[liability_cap] Liability Cap: The liability limitations in the master agreement apply to this SOW.
+[ip_ownership] IP Ownership: Work product ownership for this SOW is governed by the master agreement.
+[termination_notice] Termination Notice: The notice period for ending this SOW is the period stated in the master agreement.
+[governing_jurisdiction] Governing Jurisdiction: This SOW uses the governing law and venue stated in the master agreement.
+[confidentiality_scope] Confidentiality Scope: The parties will handle confidential materials as required by the master agreement.
+[indemnification] Indemnification: Indemnity obligations are those set out in the master agreement.
+[insurance_requirements] Insurance Requirements: Vendor will maintain the insurance required by the master agreement.

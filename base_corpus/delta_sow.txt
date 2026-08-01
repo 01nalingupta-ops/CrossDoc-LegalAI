@@ -1,0 +1,9 @@
+Fictional Delta Statement of Work
+[payment_terms] Payment Terms: Supplier will invoice monthly, and payment timing follows the master agreement.
+[liability_cap] Liability Cap: The liability cap in the master agreement governs this SOW.
+[ip_ownership] IP Ownership: Rights in deliverables are determined by the master agreement.
+[termination_notice] Termination Notice: Any convenience termination must use the notice period in the master agreement.
+[governing_jurisdiction] Governing Jurisdiction: The governing jurisdiction in the master agreement applies to this SOW.
+[confidentiality_scope] Confidentiality Scope: Confidentiality obligations are those stated in the master agreement.
+[indemnification] Indemnification: Indemnification remains as provided in the master agreement.
+[insurance_requirements] Insurance Requirements: Supplier must carry the insurance specified in the master agreement.

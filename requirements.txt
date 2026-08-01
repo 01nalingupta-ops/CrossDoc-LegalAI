@@ -1,0 +1,14 @@
+# CrossDoc-LegalAI Part 2 direct dependencies
+sentence-transformers==3.3.1
+
+# Test dependency
+pytest==8.3.4
+
+# -----------------------------------------------------------------------------
+# Checklist for the final combined environment (owned/pinned by other modules):
+# - ingestion: pymupdf, pdfplumber, pypdf, pytesseract, pillow, pdf2image, python-docx
+# - vector stores beyond this module's in-memory index: faiss-cpu, chromadb
+# - LLM SDKs: openai, anthropic
+# - plotting/reporting: matplotlib, seaborn, pandas
+# - statistics/evaluation: scipy, scikit-learn, statsmodels
+# -----------------------------------------------------------------------------
