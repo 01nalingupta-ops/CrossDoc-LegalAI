@@ -296,3 +296,112 @@ pytest -q tests/test_auditor_guardrail.py
 ```
 
 The fixture file `tests/fixtures/auditor_guardrail_fixture.json` contains five hand-written retrieval results covering payment contradiction, liability contradiction, clean confidentiality, clean termination, and a hallucinated quote path that the guardrail withholds.
+
+# CrossDoc-LegalAI Part 5: Offline Evaluation Metrics
+
+`evaluation.py` is a standalone offline statistics module. It consumes reduced ground-truth records and per-model prediction records, computes model metrics and paired statistical comparisons, and writes one `evaluation_results.json` object. It does not call LLMs and does not import any other CrossDoc-LegalAI module.
+
+## Evaluation inputs
+
+Ground truth is a JSON array with one record per benchmark pair:
+
+```json
+{
+  "pair_id": "string",
+  "has_contradiction": "boolean",
+  "contradiction_category": "string or null",
+  "severity": "High | Medium | Low | None"
+}
+```
+
+Predictions are a JSON array with one record per `(model, pair)`; multiple `model_id` values may be interleaved:
+
+```json
+{
+  "pair_id": "string",
+  "model_id": "string",
+  "has_contradiction": "boolean",
+  "confidence": "float 0.0-1.0 or null",
+  "severity": "High | Medium | Low | None",
+  "guardrail_verified": "boolean"
+}
+```
+
+## Metrics and statistical tests
+
+For each model, the module computes accuracy, precision, recall, F1, faithfulness, ROC-AUC, an overall confusion matrix, confusion matrices by contradiction category, and bootstrap 95% confidence intervals for accuracy, F1, and AUC. Faithfulness is the fraction of positive model claims where `guardrail_verified=true`; models with no positive claims receive faithfulness `1.0` because there were no unsupported positive claims.
+
+ROC-AUC uses `confidence` as the ranking score. If `confidence` is missing or `null`, the evaluator falls back to an ordinal severity score: `None=0`, `Low=1`, `Medium=2`, and `High=3`. This fallback is implemented in `_prediction_score(...)` so model outputs remain evaluable even when confidence is unavailable.
+
+For every pair of model IDs present in the prediction input, the module computes:
+
+- McNemar's paired comparison from per-pair correctness. For fewer than 25 discordant pairs it uses an exact two-sided binomial test; otherwise it uses the continuity-corrected chi-squared statistic `(abs(n01 - n10) - 1)^2 / (n01 + n10)` with 1 degree of freedom.
+- DeLong's correlated ROC-AUC comparison using Mann-Whitney structural components (`V10`/`V01`) to estimate variance and covariance on the same benchmark pairs, followed by a two-sided standard-normal p-value.
+- Holm-Bonferroni correction separately across the McNemar p-value family and the DeLong p-value family at `alpha=0.05`.
+
+The generic `paired_mcnemar_comparison(predictions_a, predictions_b, ground_truth)` helper can be reused for ablations such as guardrail-on vs guardrail-off or agentic pipeline vs baseline; it is not hardcoded to bake-off `model_id` groupings.
+
+## Evaluation output schema
+
+The CLI writes exactly one JSON object:
+
+```json
+{
+  "per_model_metrics": {
+    "<model_id>": {
+      "accuracy": "float",
+      "precision": "float",
+      "recall": "float",
+      "f1": "float",
+      "faithfulness": "float",
+      "auc": "float",
+      "confusion_matrix": {"tp": "int", "tn": "int", "fp": "int", "fn": "int"},
+      "confusion_matrix_by_category": {
+        "<category>": {"tp": "int", "tn": "int", "fp": "int", "fn": "int"}
+      },
+      "bootstrap_ci": {
+        "accuracy": ["low", "high"],
+        "f1": ["low", "high"],
+        "auc": ["low", "high"]
+      }
+    }
+  },
+  "pairwise_mcnemar": {
+    "<model_a>__vs__<model_b>": {
+      "chi2_or_exact": "float",
+      "p_value": "float",
+      "p_value_holm_adjusted": "float",
+      "significant": "boolean"
+    }
+  },
+  "pairwise_delong": {
+    "<model_a>__vs__<model_b>": {
+      "z": "float",
+      "p_value": "float",
+      "p_value_holm_adjusted": "float",
+      "significant": "boolean"
+    }
+  }
+}
+```
+
+## Evaluation CLI
+
+```bash
+python evaluation.py --ground-truth tests/fixtures/evaluation_ground_truth.json \
+  --predictions tests/fixtures/evaluation_predictions.json \
+  --out evaluation_results.json
+```
+
+Optional flags:
+
+- `--bootstrap-resamples`: defaults to `1000`.
+- `--seed`: deterministic bootstrap seed, defaults to `12345`.
+
+## Part 5 tests
+
+```bash
+pytest -q tests/test_evaluation.py
+```
+
+The tests include hand-checked confusion-matrix metrics, a McNemar exact-binomial p-value, a severity-fallback AUC case, and a bootstrap CI sanity check that verifies larger samples produce narrower intervals than smaller samples with the same error rate.

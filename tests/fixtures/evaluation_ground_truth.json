@@ -1,0 +1,8 @@
+[
+  {"pair_id": "p1", "has_contradiction": true, "contradiction_category": "Payment Terms", "severity": "Medium"},
+  {"pair_id": "p2", "has_contradiction": false, "contradiction_category": null, "severity": "None"},
+  {"pair_id": "p3", "has_contradiction": true, "contradiction_category": "Liability Cap", "severity": "High"},
+  {"pair_id": "p4", "has_contradiction": false, "contradiction_category": null, "severity": "None"},
+  {"pair_id": "p5", "has_contradiction": true, "contradiction_category": "Termination Notice", "severity": "Low"},
+  {"pair_id": "p6", "has_contradiction": false, "contradiction_category": null, "severity": "None"}
+]

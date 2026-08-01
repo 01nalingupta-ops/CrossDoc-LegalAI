@@ -1,0 +1,22 @@
+[
+  {"pair_id": "p1", "model_id": "alpha", "has_contradiction": true, "confidence": 0.90, "severity": "Medium", "guardrail_verified": true},
+  {"pair_id": "p2", "model_id": "alpha", "has_contradiction": false, "confidence": 0.10, "severity": "None", "guardrail_verified": true},
+  {"pair_id": "p3", "model_id": "alpha", "has_contradiction": true, "confidence": 0.80, "severity": "High", "guardrail_verified": true},
+  {"pair_id": "p4", "model_id": "alpha", "has_contradiction": false, "confidence": 0.20, "severity": "None", "guardrail_verified": true},
+  {"pair_id": "p5", "model_id": "alpha", "has_contradiction": false, "confidence": 0.40, "severity": "Low", "guardrail_verified": true},
+  {"pair_id": "p6", "model_id": "alpha", "has_contradiction": true, "confidence": 0.60, "severity": "Medium", "guardrail_verified": false},
+
+  {"pair_id": "p1", "model_id": "beta", "has_contradiction": false, "confidence": 0.40, "severity": "Low", "guardrail_verified": true},
+  {"pair_id": "p2", "model_id": "beta", "has_contradiction": false, "confidence": 0.20, "severity": "None", "guardrail_verified": true},
+  {"pair_id": "p3", "model_id": "beta", "has_contradiction": true, "confidence": 0.70, "severity": "High", "guardrail_verified": true},
+  {"pair_id": "p4", "model_id": "beta", "has_contradiction": true, "confidence": 0.65, "severity": "Medium", "guardrail_verified": false},
+  {"pair_id": "p5", "model_id": "beta", "has_contradiction": true, "confidence": 0.75, "severity": "Low", "guardrail_verified": true},
+  {"pair_id": "p6", "model_id": "beta", "has_contradiction": false, "confidence": 0.30, "severity": "None", "guardrail_verified": true},
+
+  {"pair_id": "p1", "model_id": "gamma", "has_contradiction": true, "confidence": null, "severity": "High", "guardrail_verified": true},
+  {"pair_id": "p2", "model_id": "gamma", "has_contradiction": false, "confidence": null, "severity": "None", "guardrail_verified": true},
+  {"pair_id": "p3", "model_id": "gamma", "has_contradiction": false, "confidence": null, "severity": "None", "guardrail_verified": true},
+  {"pair_id": "p4", "model_id": "gamma", "has_contradiction": false, "confidence": null, "severity": "None", "guardrail_verified": true},
+  {"pair_id": "p5", "model_id": "gamma", "has_contradiction": true, "confidence": null, "severity": "Low", "guardrail_verified": true},
+  {"pair_id": "p6", "model_id": "gamma", "has_contradiction": false, "confidence": null, "severity": "None", "guardrail_verified": true}
+]
