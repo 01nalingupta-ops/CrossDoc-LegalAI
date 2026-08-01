@@ -1,0 +1,26 @@
+{
+  "doc_id": "service-fixture-a",
+  "doc_type": "service",
+  "source_path": "fixtures/service_a.pdf",
+  "full_text": "Supplier invoices are payable within 30 days. Vendor shall keep customer data confidential.",
+  "page_count": 1,
+  "extraction_method": "digital",
+  "chunks": [
+    {
+      "chunk_id": "service-a-payment",
+      "text": "Supplier invoices are payable within 30 days after receipt.",
+      "char_start": 0,
+      "char_end": 56,
+      "page_num": 1,
+      "overlap_chars": 150
+    },
+    {
+      "chunk_id": "service-a-confidentiality",
+      "text": "Vendor shall keep customer data and trade secrets confidential and avoid disclosure.",
+      "char_start": 57,
+      "char_end": 135,
+      "page_num": 1,
+      "overlap_chars": 150
+    }
+  ]
+}

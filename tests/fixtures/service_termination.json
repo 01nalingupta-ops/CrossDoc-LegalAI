@@ -1,0 +1,26 @@
+{
+  "doc_id": "service-fixture-b",
+  "doc_type": "service",
+  "source_path": "fixtures/service_b.pdf",
+  "full_text": "The agreement can end after uncured breach. Fees are due after invoice approval.",
+  "page_count": 1,
+  "extraction_method": "digital",
+  "chunks": [
+    {
+      "chunk_id": "service-b-termination",
+      "text": "The agreement may terminate when a material breach remains uncured.",
+      "char_start": 0,
+      "char_end": 66,
+      "page_num": 1,
+      "overlap_chars": 150
+    },
+    {
+      "chunk_id": "service-b-payment",
+      "text": "Fees are due after invoice approval and payment processing.",
+      "char_start": 67,
+      "char_end": 125,
+      "page_num": 1,
+      "overlap_chars": 150
+    }
+  ]
+}

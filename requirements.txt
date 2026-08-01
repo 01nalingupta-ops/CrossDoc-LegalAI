@@ -1,15 +1,13 @@
-# CrossDoc-LegalAI Part 8 direct dependencies
-# This orchestration/reproducibility module intentionally uses only the Python standard library.
+# CrossDoc-LegalAI Part 2 direct dependencies
+sentence-transformers==3.3.1
 
-# Test dependency for this part
+# Test dependency
 pytest==8.3.4
 
 # -----------------------------------------------------------------------------
 # Checklist for the final combined environment (owned/pinned by other modules):
-# - pdf parsing: pymupdf, pdfplumber, pypdf
-# - OCR: pytesseract, pillow, pdf2image
-# - DOCX parsing: python-docx
-# - embeddings/vector search: sentence-transformers, faiss-cpu, numpy
+# - ingestion: pymupdf, pdfplumber, pypdf, pytesseract, pillow, pdf2image, python-docx
+# - vector stores beyond this module's in-memory index: faiss-cpu, chromadb
 # - LLM SDKs: openai, anthropic
 # - plotting/reporting: matplotlib, seaborn, pandas
 # - statistics/evaluation: scipy, scikit-learn, statsmodels
