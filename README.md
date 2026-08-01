@@ -405,3 +405,115 @@ pytest -q tests/test_evaluation.py
 ```
 
 The tests include hand-checked confusion-matrix metrics, a McNemar exact-binomial p-value, a severity-fallback AUC case, and a bootstrap CI sanity check that verifies larger samples produce narrower intervals than smaller samples with the same error rate.
+
+# CrossDoc-LegalAI Part 6: Report Exporter
+
+`report_export.py` is a presentation-only module. It consumes a completed `evaluation_results.json` object plus two caller-supplied run identifiers (`seed` and `dataset_hash`) and exports paper-ready figures, LaTeX table snippets, CSV inspection tables, and draft captions. It does **not** compute metrics or statistical tests; all numbers are trusted from the input JSON.
+
+## Report input schema
+
+The required input is one JSON object with this shape:
+
+```json
+{
+  "per_model_metrics": {
+    "<model_id>": {
+      "accuracy": "float",
+      "precision": "float",
+      "recall": "float",
+      "f1": "float",
+      "faithfulness": "float",
+      "auc": "float",
+      "confusion_matrix": {"tp": "int", "tn": "int", "fp": "int", "fn": "int"},
+      "confusion_matrix_by_category": {
+        "<category>": {"tp": "int", "tn": "int", "fp": "int", "fn": "int"}
+      },
+      "bootstrap_ci": {
+        "accuracy": ["low", "high"],
+        "f1": ["low", "high"],
+        "auc": ["low", "high"]
+      }
+    }
+  },
+  "pairwise_mcnemar": {
+    "<model_a>__vs__<model_b>": {
+      "p_value": "float",
+      "p_value_holm_adjusted": "float",
+      "significant": "boolean"
+    }
+  },
+  "pairwise_delong": {
+    "<model_a>__vs__<model_b>": {
+      "p_value": "float",
+      "p_value_holm_adjusted": "float",
+      "significant": "boolean"
+    }
+  }
+}
+```
+
+Optional ROC points can be supplied as a separate JSON file with:
+
+```json
+{"<model_id>": [{"fpr": 0.0, "tpr": 0.0}, {"fpr": 1.0, "tpr": 1.0}]}
+```
+
+When ROC points are not provided, the ROC figure gracefully falls back to an AUC bar chart and notes that the figure is based only on per-model AUC values.
+
+## Exported report artifacts
+
+For every figure, the exporter writes vector-style `pdf` and `eps` files plus a 300-DPI `png` preview. It also writes a `captions.md` file with one draft caption per figure. The required figures are:
+
+1. Grouped bar chart for accuracy, precision, recall, and F1 by model.
+2. Overlaid ROC curves, or AUC-bar fallback when raw ROC points are absent.
+3. Confusion-matrix small multiples by model.
+4. Bootstrap confidence-interval plot for accuracy, F1, and AUC.
+5. McNemar Holm-adjusted p-value heatmap with significant cells outlined.
+6. DeLong Holm-adjusted p-value heatmap with significant cells outlined.
+7. Generic two-dictionary ablation bar chart.
+8. Generic two-dictionary baseline-vs-best bar chart.
+
+The required tables are exported as both `.tex` tabular snippets and `.csv` files:
+
+- `per_model_metrics`: Accuracy, Precision, Recall, F1, AUC, and Faithfulness.
+- `mcnemar_pvalues`: pairwise Holm-adjusted McNemar p-values, with `*` on significant cells.
+- `delong_pvalues`: pairwise Holm-adjusted DeLong p-values, with `*` on significant cells.
+
+## Style and reproducibility
+
+The preferred plotting backend is Matplotlib with `DejaVu Sans` at a consistent base font size of 10, which reads cleanly in LNCS-style paper drafts. Model colors are assigned once from sorted `model_id` values and reused across all figures so each model remains visually consistent. In minimal environments where Matplotlib is unavailable, the module falls back to a small Pillow renderer so the CLI and tests still produce all required files.
+
+Every exported filename is built through `build_artifact_path(...)`, which embeds the run seed and dataset hash, for example:
+
+```text
+model_metric_bars_seed42_hashabc123.pdf
+mcnemar_pvalues_seed42_hashabc123.tex
+captions_seed42_hashabc123.md
+```
+
+## Report CLI
+
+```bash
+python report_export.py --eval-results tests/fixtures/report_evaluation_results.json \
+  --seed 42 \
+  --dataset-hash abc123 \
+  --out-dir exports/
+```
+
+Optional ROC-points input:
+
+```bash
+python report_export.py --eval-results evaluation_results.json \
+  --seed 42 \
+  --dataset-hash abc123 \
+  --out-dir exports/ \
+  --roc-points roc_points.json
+```
+
+## Part 6 tests
+
+```bash
+pytest -q tests/test_report_export.py
+```
+
+The tests run a full export against a 4-model mock `evaluation_results.json`, assert that every required figure/table/caption file exists, verify all filenames contain the seed/hash linkage, and confirm the optional ROC-points path does not raise.
