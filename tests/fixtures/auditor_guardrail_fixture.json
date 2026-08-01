@@ -1,0 +1,62 @@
+{
+  "pair_id": "fixture-pair-001",
+  "master_full_text": "1. Payment. Customer shall pay all undisputed invoices within Net 30 days. 2. Liability. Supplier's aggregate liability is capped at fees paid in the prior twelve months. 3. Confidentiality. Confidential Information includes business, technical, and pricing information disclosed by either party. 4. Termination. Either party may terminate for convenience with 30 days' written notice. 5. Governing Law. This Agreement is governed by New York law.",
+  "service_full_text": "SOW A Payment. Customer shall pay all undisputed invoices within Net 60 days. SOW B Liability. Supplier's liability is uncapped for all claims under this SOW. SOW C Confidentiality. Confidential Information includes business, technical, and pricing information disclosed by either party. SOW D Termination. Either party may terminate for convenience with 30 days' written notice. SOW E Hallucinate. Customer requests hallucinate handling while invoices are paid within Net 60 days.",
+  "retrieval_results": [
+    {
+      "service_chunk_id": "sow-chunk-payment",
+      "service_chunk_text": "Customer shall pay all undisputed invoices within Net 60 days.",
+      "matched_master_chunks": [
+        {
+          "master_chunk_id": "msa-chunk-payment",
+          "master_chunk_text": "Customer shall pay all undisputed invoices within Net 30 days.",
+          "similarity_score": 0.95
+        }
+      ]
+    },
+    {
+      "service_chunk_id": "sow-chunk-clean-confidentiality",
+      "service_chunk_text": "Confidential Information includes business, technical, and pricing information disclosed by either party.",
+      "matched_master_chunks": [
+        {
+          "master_chunk_id": "msa-chunk-confidentiality",
+          "master_chunk_text": "Confidential Information includes business, technical, and pricing information disclosed by either party.",
+          "similarity_score": 0.98
+        }
+      ]
+    },
+    {
+      "service_chunk_id": "sow-chunk-hallucinated-quote",
+      "service_chunk_text": "Customer requests hallucinate handling while invoices are paid within Net 60 days.",
+      "matched_master_chunks": [
+        {
+          "master_chunk_id": "msa-chunk-payment",
+          "master_chunk_text": "Customer shall pay all undisputed invoices within Net 30 days.",
+          "similarity_score": 0.8
+        }
+      ]
+    },
+    {
+      "service_chunk_id": "sow-chunk-liability",
+      "service_chunk_text": "Supplier's liability is uncapped for all claims under this SOW.",
+      "matched_master_chunks": [
+        {
+          "master_chunk_id": "msa-chunk-liability",
+          "master_chunk_text": "Supplier's aggregate liability is capped at fees paid in the prior twelve months.",
+          "similarity_score": 0.91
+        }
+      ]
+    },
+    {
+      "service_chunk_id": "sow-chunk-clean-termination",
+      "service_chunk_text": "Either party may terminate for convenience with 30 days' written notice.",
+      "matched_master_chunks": [
+        {
+          "master_chunk_id": "msa-chunk-termination",
+          "master_chunk_text": "Either party may terminate for convenience with 30 days' written notice.",
+          "similarity_score": 0.97
+        }
+      ]
+    }
+  ]
+}
