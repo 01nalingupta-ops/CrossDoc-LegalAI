@@ -78,3 +78,24 @@ def test_auc_uses_severity_fallback_when_confidence_missing():
     ]
     result = evaluate(gt, preds, bootstrap_resamples=20)
     assert result["per_model_metrics"]["fallback"]["auc"] == pytest.approx(1.0)
+
+
+def test_evaluation_excludes_unconfigured_candidate_placeholders_from_pairwise_tests():
+    gt = [
+        {"pair_id": "p1", "has_contradiction": True, "contradiction_category": "Payment Terms", "severity": "High"},
+        {"pair_id": "p2", "has_contradiction": False, "contradiction_category": None, "severity": "None"},
+    ]
+    preds = [
+        {"pair_id": "p1", "model_id": "candidate_1", "has_contradiction": True, "confidence": 0.9, "severity": "High", "guardrail_verified": True},
+        {"pair_id": "p2", "model_id": "candidate_1", "has_contradiction": False, "confidence": 0.1, "severity": "None", "guardrail_verified": True},
+        {"pair_id": "p1", "model_id": "candidate_2", "has_contradiction": True, "confidence": 0.8, "severity": "Medium", "guardrail_verified": True},
+        {"pair_id": "p2", "model_id": "candidate_2", "has_contradiction": False, "confidence": 0.2, "severity": "None", "guardrail_verified": True},
+        {"pair_id": "p1", "model_id": "candidate_3", "has_contradiction": False, "confidence": 0.0, "severity": "None", "guardrail_verified": True, "evaluation_excluded": True},
+        {"pair_id": "p2", "model_id": "candidate_3", "has_contradiction": False, "confidence": 0.0, "severity": "None", "guardrail_verified": True, "evaluation_excluded": True},
+    ]
+
+    result = evaluate(gt, preds, bootstrap_resamples=10, seed=3)
+
+    assert set(result["per_model_metrics"]) == {"candidate_1", "candidate_2"}
+    assert set(result["pairwise_mcnemar"]) == {"candidate_1__vs__candidate_2"}
+    assert set(result["pairwise_delong"]) == {"candidate_1__vs__candidate_2"}

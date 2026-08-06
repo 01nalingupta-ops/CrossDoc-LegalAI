@@ -249,12 +249,13 @@ def _placeholder_prediction(item: dict[str, Any], model_slot: str, retrieval_res
         "has_contradiction": False,
         "confidence": 0.0,
         "severity": "None",
-        "conflict_explanation": "No adapter configured for this candidate slot in Part 9.",
+        "conflict_explanation": "No adapter configured for this candidate slot; retained in the audit log but excluded from evaluation metrics.",
         "msa_exact_quote": "",
         "sow_exact_quote": "",
         "suggested_redline": "",
         "guardrail_verified": True,
         "guardrail_action": "passed",
+        "evaluation_excluded": True,
         "retrieval_result": retrieval_result,
     }
 

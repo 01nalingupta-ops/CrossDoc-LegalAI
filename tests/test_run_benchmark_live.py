@@ -123,3 +123,4 @@ def test_unconfigured_candidate_placeholders_keep_verified_prediction_schema():
     assert prediction["has_contradiction"] is False
     assert prediction["guardrail_verified"] is True
     assert prediction["guardrail_action"] == "passed"
+    assert prediction["evaluation_excluded"] is True

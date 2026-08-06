@@ -2,10 +2,10 @@
 
 The Streamlit UI in `app.py` now selects a pipeline module with `CROSSDOC_PIPELINE`:
 
-- `CROSSDOC_PIPELINE=live` (default): uses `pipeline_live.py`, which calls the real Part 1 ingestion, Part 2 retrieval, and Part 4 auditor+guardrail modules. Part 9 still uses `MockAdapter` behind the auditor interface until Part 10 adds the local NLI adapter.
+- `CROSSDOC_PIPELINE=live` (default): uses `pipeline_live.py`, which calls the real Part 1 ingestion, Part 2 retrieval, and Part 4 auditor+guardrail modules. The live auditor adapter defaults to `LocalNLIAdapter` for the `candidate_2` research path; set `CROSSDOC_AUDITOR_ADAPTER=mock` only for dependency-light smoke tests.
 - `CROSSDOC_PIPELINE=stub`: uses `pipeline_stubs.py`, preserving the standalone/offline Part 7 demo and grading path.
 
-For low-dependency smoke tests of the live UI path, set `CROSSDOC_EMBEDDING_BACKEND=keyword-fixture`. For low-dependency benchmark smoke tests, set `CROSSDOC_BENCHMARK_EMBEDDING_BACKEND=keyword-fixture`. Both live defaults remain `sentence-transformers` with `all-MiniLM-L6-v2`.
+For low-dependency smoke tests of the live UI path, set `CROSSDOC_EMBEDDING_BACKEND=keyword-fixture` and, when model weights are unavailable, `CROSSDOC_AUDITOR_ADAPTER=mock`. For low-dependency benchmark smoke tests, set `CROSSDOC_BENCHMARK_EMBEDDING_BACKEND=keyword-fixture`. Both retrieval defaults remain `sentence-transformers` with `all-MiniLM-L6-v2`; the auditor default remains local NLI and requires the configured HuggingFace model weights.
 
 Both pipeline modules export the same UI contract: `parse_document`, `retrieve_matches`, `run_auditor_and_guardrail`, `sort_predictions_for_display`, and `infer_category`.
 
@@ -87,4 +87,4 @@ Returns `VerifiedPrediction` objects:
 }
 ```
 
-Live mode calls `auditor_guardrail.run_auditor_and_guardrail` for each retrieval result and every adapter output flows through `apply_guardrail(...)` unchanged. Stub mode keeps its standalone deterministic auditor and substring guardrail so the offline UI still demonstrates both verified findings and `claim_withheld` safety behavior.
+Live mode calls `auditor_guardrail.run_auditor_and_guardrail` for each retrieval result and every adapter output flows through `apply_guardrail(...)` unchanged. `LocalNLIAdapter` is configured in `auditor_config.json` with model name/revision, threshold, severity bands, and label aliases. Stub mode keeps its standalone deterministic auditor and substring guardrail so the offline UI still demonstrates both verified findings and `claim_withheld` safety behavior.

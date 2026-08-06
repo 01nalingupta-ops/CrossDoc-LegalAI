@@ -28,7 +28,7 @@ def evaluate(
     seed: int = 12345,
 ) -> dict[str, Any]:
     gt_by_pair = {row["pair_id"]: row for row in ground_truth}
-    preds_by_model = _group_predictions_by_model(predictions)
+    preds_by_model = _group_predictions_by_model(_evaluation_predictions(predictions))
 
     per_model = {}
     correctness_by_model = {}
@@ -254,6 +254,16 @@ def _percentile_ci(values: list[float]) -> list[float]:
 
 def _safe_div(numerator: float, denominator: float) -> float:
     return 0.0 if denominator == 0 else numerator / denominator
+
+
+def _evaluation_predictions(predictions: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Return predictions that should participate in metrics/statistical tests.
+
+    Unconfigured future bake-off slots may still be written to the audit JSONL for
+    schema compatibility, but they are not real model outputs and must not enter
+    McNemar or DeLong comparisons.
+    """
+    return [pred for pred in predictions if not bool(pred.get("evaluation_excluded", False))]
 
 
 def _group_predictions_by_model(predictions: list[dict[str, Any]]) -> dict[str, dict[str, dict[str, Any]]]:

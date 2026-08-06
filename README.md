@@ -234,6 +234,8 @@ Three adapters are included:
 
 The live pipeline uses `CROSSDOC_AUDITOR_ADAPTER=local-nli` by default. Set `CROSSDOC_AUDITOR_ADAPTER=mock` only for dependency-light smoke tests or deterministic UI demos.
 
+In benchmark runs, `candidate_1` remains the deterministic `MockAdapter` baseline and `candidate_2` uses the live adapter hook. Unconfigured future slots (`candidate_3`/`candidate_4`) are kept in `verified_predictions.jsonl` for audit-schema compatibility with `evaluation_excluded=true`, so evaluation metrics and McNemar/DeLong comparisons only include real configured model outputs.
+
 Every real adapter call sends `temperature=0.0` where the backend exposes a sampling temperature. Adding another provider should only require a small new subclass of `AuditorModelAdapter`; orchestration code should not import provider SDKs or provider-specific settings.
 
 ### Fixed prompt template
