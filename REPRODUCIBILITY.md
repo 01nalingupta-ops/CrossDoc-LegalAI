@@ -43,7 +43,7 @@ This prints the intended ingestion, dataset generation, retrieval, auditor/guard
 python run_benchmark.py --seed-manifest seed_manifest.json --corpus-dir raw_doc_pairs --out-dir reproduced_run
 ```
 
-This produces a real `benchmark_dataset.json`, `verified_predictions.jsonl`, `evaluation_results.json`, and `report_export/` artifacts. Retrieval uses the real matchmaker with the default `sentence-transformers` backend; constrained smoke-test environments may set `CROSSDOC_BENCHMARK_EMBEDDING_BACKEND=keyword-fixture` to exercise the same orchestration contracts without downloading the embedding model. Candidate slots are still explicit: `candidate_1` is the rule-based `MockAdapter` baseline, `candidate_2` uses the live pipeline adapter hook (also `MockAdapter` during Part 9), and `candidate_3`/`candidate_4` are logged as unconfigured placeholder candidate slots until future adapters are added.
+This produces a real `benchmark_dataset.json`, `verified_predictions.jsonl`, `evaluation_results.json`, and `report_export/` artifacts. Retrieval uses the real matchmaker with the default `sentence-transformers` backend; constrained smoke-test environments may set `CROSSDOC_BENCHMARK_EMBEDDING_BACKEND=keyword-fixture` to exercise the same orchestration contracts without downloading the embedding model. Candidate slots are explicit: `candidate_1` is the rule-based `MockAdapter` baseline, `candidate_2` uses the live pipeline adapter hook and defaults to `LocalNLIAdapter`, and `candidate_3`/`candidate_4` are retained as schema-compatible unconfigured audit-log placeholders marked `evaluation_excluded=true` so they do not enter McNemar or DeLong comparisons.
 
 ### 4. Module commands represented by the orchestrator
 
