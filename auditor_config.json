@@ -1,0 +1,17 @@
+{
+  "local_nli": {
+    "model_name": "cross-encoder/nli-deberta-v3-small",
+    "model_revision": "main",
+    "contradiction_threshold": 0.55,
+    "severity_bands": [
+      {"severity": "High", "min_confidence": 0.85},
+      {"severity": "Medium", "min_confidence": 0.70},
+      {"severity": "Low", "min_confidence": 0.55}
+    ],
+    "label_aliases": {
+      "contradiction": ["contradiction", "label_2"],
+      "neutral": ["neutral", "label_1"],
+      "entailment": ["entailment", "label_0"]
+    }
+  }
+}

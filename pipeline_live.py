@@ -2,8 +2,8 @@
 
 This module intentionally exports the same public functions consumed by ``app.py`` as
 ``pipeline_stubs.py`` while delegating to the real Part 1 ingestion, Part 2 retrieval,
-and Part 4 auditor+guardrail modules. The auditor adapter remains ``MockAdapter`` for
-Part 9; Part 10 can swap the adapter without changing UI contracts.
+and Part 4 auditor+guardrail modules. The default live auditor adapter is the
+Part 10 local NLI adapter; tests and offline smoke runs may explicitly select the mock adapter.
 """
 from __future__ import annotations
 
@@ -15,7 +15,7 @@ from typing import Any, BinaryIO
 import auditor_guardrail
 import ingestion
 import matchmaker
-from model_adapter import MockAdapter
+from model_adapter import AuditorModelAdapter, LocalNLIAdapter, MockAdapter
 from pipeline_stubs import infer_category, sort_predictions_for_display
 
 
@@ -52,16 +52,24 @@ def run_auditor_and_guardrail(
     ``model_id`` is accepted for signature compatibility with ``pipeline_stubs`` but the
     returned model identifier is owned by the active adapter.
     """
-    adapter = MockAdapter()
+    adapter = get_auditor_adapter()
     return [
         auditor_guardrail.run_auditor_and_guardrail(result, master_full_text, service_full_text, adapter, pair_id)
         for result in retrieval_results
     ]
 
 
-def get_auditor_adapter() -> MockAdapter:
+def get_auditor_adapter() -> AuditorModelAdapter:
     """Return the live pipeline's current auditor adapter for orchestrator bake-offs."""
-    return MockAdapter()
+    adapter_name = os.environ.get("CROSSDOC_AUDITOR_ADAPTER")
+    if adapter_name is None and os.environ.get("CROSSDOC_EMBEDDING_BACKEND") == "keyword-fixture":
+        adapter_name = "mock"
+    adapter_name = (adapter_name or "local-nli").strip().lower()
+    if adapter_name == "local-nli":
+        return LocalNLIAdapter()
+    if adapter_name == "mock":
+        return MockAdapter()
+    raise ValueError("CROSSDOC_AUDITOR_ADAPTER must be 'local-nli' or 'mock'")
 
 
 def _configured_embedder() -> matchmaker.EmbeddingModel | None:

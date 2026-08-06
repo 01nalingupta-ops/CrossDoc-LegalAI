@@ -224,12 +224,17 @@ Adapters receive the Service chunk text and the list of matched Master chunks fr
 }
 ```
 
-Two adapters are included:
+Three adapters are included:
 
-- `MockAdapter`: deterministic, no-network test adapter used by default by the CLI.
-- `OpenAICompatibleAdapter`: generic `/chat/completions` adapter configurable with `OPENAI_COMPATIBLE_API_KEY`, `OPENAI_COMPATIBLE_BASE_URL`, and `OPENAI_COMPATIBLE_MODEL`.
+- `MockAdapter`: deterministic, no-network test adapter used as the `candidate_1` rule baseline.
+- `LocalNLIAdapter`: local HuggingFace NLI adapter used by the live pipeline's `candidate_2` hook. It runs the configured NLI model on each matched Master chunk as `premise=master_chunk_text` and `hypothesis=service_chunk_text`, selects the highest contradiction probability, derives severity from configured bands, and emits exact chunk texts as quotes so the deterministic guardrail can verify evidence by construction.
+- `OpenAICompatibleAdapter`: generic `/chat/completions` adapter configurable with `OPENAI_COMPATIBLE_API_KEY`, `OPENAI_COMPATIBLE_BASE_URL`, and `OPENAI_COMPATIBLE_MODEL`. It is not required by the default pipeline.
 
-Every real adapter call sends `temperature=0.0`. Adding another provider should only require a small new subclass of `AuditorModelAdapter`; orchestration code should not import provider SDKs or provider-specific settings.
+`LocalNLIAdapter` is configured in `auditor_config.json`. The default config pins `cross-encoder/nli-deberta-v3-small` at revision `main`, sets `contradiction_threshold`, defines confidence-to-severity bands, and lists label aliases for contradiction/neutral/entailment outputs. Override the config path with `CROSSDOC_AUDITOR_CONFIG=/path/to/auditor_config.json`. The adapter lazy-loads `transformers.pipeline(...)` on first use so importing `model_adapter.py` does not download or initialize model weights.
+
+The live pipeline uses `CROSSDOC_AUDITOR_ADAPTER=local-nli` by default. Set `CROSSDOC_AUDITOR_ADAPTER=mock` only for dependency-light smoke tests or deterministic UI demos.
+
+Every real adapter call sends `temperature=0.0` where the backend exposes a sampling temperature. Adding another provider should only require a small new subclass of `AuditorModelAdapter`; orchestration code should not import provider SDKs or provider-specific settings.
 
 ### Fixed prompt template
 
