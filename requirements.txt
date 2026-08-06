@@ -1,6 +1,10 @@
 # CrossDoc-LegalAI Part 2 direct dependencies
 sentence-transformers==3.3.1
 
+# CrossDoc-LegalAI Part 10 local NLI auditor dependencies
+transformers==4.48.3
+torch==2.5.1
+
 # Test dependency
 pytest==8.3.4
 
