@@ -1,14 +1,15 @@
-# CrossDoc-LegalAI Part 7 Integration Seams
+# CrossDoc-LegalAI Integration Seams
 
-The Streamlit UI in `app.py` depends on exactly three pipeline functions. Today they are imported from `pipeline_stubs.py`:
+The Streamlit UI in `app.py` now selects a pipeline module with `CROSSDOC_PIPELINE`:
 
-```python
-from pipeline_stubs import parse_document, retrieve_matches, run_auditor_and_guardrail
-```
+- `CROSSDOC_PIPELINE=live` (default): uses `pipeline_live.py`, which calls the real Part 1 ingestion, Part 2 retrieval, and Part 4 auditor+guardrail modules. Part 9 still uses `MockAdapter` behind the auditor interface until Part 10 adds the local NLI adapter.
+- `CROSSDOC_PIPELINE=stub`: uses `pipeline_stubs.py`, preserving the standalone/offline Part 7 demo and grading path.
 
-To swap in production modules later, create a module that exports the same three names with the same signatures and schemas, then change that one import line in `app.py`.
+For low-dependency smoke tests of the live UI path, set `CROSSDOC_EMBEDDING_BACKEND=keyword-fixture`. For low-dependency benchmark smoke tests, set `CROSSDOC_BENCHMARK_EMBEDDING_BACKEND=keyword-fixture`. Both live defaults remain `sentence-transformers` with `all-MiniLM-L6-v2`.
 
-## 1. Ingestion stub
+Both pipeline modules export the same UI contract: `parse_document`, `retrieve_matches`, `run_auditor_and_guardrail`, `sort_predictions_for_display`, and `infer_category`.
+
+## 1. Ingestion contract
 
 ```python
 parse_document(file, doc_type: str) -> dict
@@ -16,7 +17,10 @@ parse_document(file, doc_type: str) -> dict
 
 - `file`: Streamlit `UploadedFile`, path, bytes, or file-like object.
 - `doc_type`: exactly `"master"` or `"service"`.
-- Returns a `ParsedDocument` dict:
+- Live mode delegates to `ingestion.parse_document`; uploaded bytes are written to a temporary file only long enough for the ingestion call.
+- Stub mode remains dependency-free and extracts literal text from simple demo PDFs.
+
+Returns a `ParsedDocument` dict:
 
 ```json
 {
@@ -32,9 +36,7 @@ parse_document(file, doc_type: str) -> dict
 }
 ```
 
-The current stub extracts literal PDF text from simple demo PDFs and chunks at approximately 800 characters with 150-character overlap.
-
-## 2. Retrieval stub
+## 2. Retrieval contract
 
 ```python
 retrieve_matches(master_doc: dict, service_doc: dict) -> list[dict]
@@ -52,9 +54,9 @@ Returns one `RetrievalResult` per service chunk:
 }
 ```
 
-The current stub uses lexical cosine similarity and returns the top two master chunks.
+Live mode delegates to `matchmaker.retrieve_pair` and returns top-2 semantic matches from a master-only in-memory index. Stub mode uses lexical cosine similarity and also returns the top two master chunks.
 
-## 3. Auditor + guardrail stub
+## 3. Auditor + guardrail contract
 
 ```python
 run_auditor_and_guardrail(
@@ -62,7 +64,7 @@ run_auditor_and_guardrail(
     master_full_text: str,
     service_full_text: str,
     pair_id: str = "demo-pair",
-    model_id: str = "stub-rule-auditor-v1",
+    model_id: str | None = None,
 ) -> list[dict]
 ```
 
@@ -85,4 +87,4 @@ Returns `VerifiedPrediction` objects:
 }
 ```
 
-The current stub is deterministic and offline. It flags simple Net 60 vs Net 30 and uncapped-liability mismatches, then performs a real substring guardrail check. The sample SOW includes an intentionally unverified trigger so the UI visibly renders the required `claim_withheld` safety state.
+Live mode calls `auditor_guardrail.run_auditor_and_guardrail` for each retrieval result and every adapter output flows through `apply_guardrail(...)` unchanged. Stub mode keeps its standalone deterministic auditor and substring guardrail so the offline UI still demonstrates both verified findings and `claim_withheld` safety behavior.

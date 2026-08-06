@@ -1,17 +1,31 @@
-"""Streamlit UI for CrossDoc-LegalAI Part 7.
-
-Swap the stub pipeline for real modules by changing this import line only, provided the
-replacement exports parse_document, retrieve_matches, and run_auditor_and_guardrail with
-the same signatures documented in INTEGRATION.md.
-"""
+"""Streamlit UI for CrossDoc-LegalAI."""
 
 from __future__ import annotations
 
 import json
+import os
 from datetime import datetime, UTC
 
 from pdf_utils import build_report_pdf
-from pipeline_stubs import infer_category, parse_document, retrieve_matches, run_auditor_and_guardrail, sort_predictions_for_display
+
+
+def _load_pipeline():
+    pipeline_name = os.environ.get("CROSSDOC_PIPELINE", "live").strip().lower()
+    if pipeline_name == "stub":
+        import pipeline_stubs as pipeline
+    elif pipeline_name == "live":
+        import pipeline_live as pipeline
+    else:
+        raise ValueError("CROSSDOC_PIPELINE must be 'stub' or 'live'")
+    return pipeline_name, pipeline
+
+
+PIPELINE_NAME, PIPELINE = _load_pipeline()
+parse_document = PIPELINE.parse_document
+retrieve_matches = PIPELINE.retrieve_matches
+run_auditor_and_guardrail = PIPELINE.run_auditor_and_guardrail
+sort_predictions_for_display = PIPELINE.sort_predictions_for_display
+infer_category = PIPELINE.infer_category
 
 
 def main() -> None:
@@ -19,7 +33,7 @@ def main() -> None:
 
     st.set_page_config(page_title="CrossDoc-LegalAI", layout="wide")
     st.title("CrossDoc-LegalAI: Master vs. Service Document")
-    st.caption("Standalone Part 7 demo using offline stubs. No API keys required.")
+    st.caption(f"Pipeline: {PIPELINE_NAME}. Live mode uses real ingestion, retrieval, and guardrail; stub mode remains offline.")
 
     left, right = st.columns(2)
     with left:
@@ -64,7 +78,7 @@ def render_results(report: dict) -> None:
     export_right.download_button("Download summary PDF", pdf_bytes, file_name="crossdoc_report.pdf", mime="application/pdf")
 
     if not positives:
-        st.success("No contradictions were found by the offline stub auditor.")
+        st.success("No contradictions were found by the active auditor.")
         return
 
     for prediction in positives:

@@ -19,7 +19,7 @@ For per-pair dataset seeds, labels are `dataset_generation_seed:0000`, `dataset_
 
 ## Commands to regenerate a benchmark run
 
-A reviewer can run the placeholder pipeline today. In the final integrated system, the same top-level command sequence will call the real modules behind the documented JSON contracts.
+A reviewer can run the integrated pipeline today. The top-level orchestrator preserves a side-effect-free dry-run mode, while normal runs call the real ingestion, dataset generation, retrieval, auditor/guardrail, evaluation, and report-export modules behind the documented JSON contracts.
 
 ### 1. Create or validate the seed manifest
 
@@ -37,26 +37,26 @@ python run_benchmark.py --seed-manifest seed_manifest.json --corpus-dir raw_doc_
 
 This prints the intended ingestion, dataset generation, retrieval, auditor/guardrail, evaluation, and report-export call sequence.
 
-### 3. Run the full placeholder orchestration
+### 3. Run the full orchestration
 
 ```bash
 python run_benchmark.py --seed-manifest seed_manifest.json --corpus-dir raw_doc_pairs --out-dir reproduced_run
 ```
 
-Today this produces mock JSON artifacts with `[PLACEHOLDER]` log lines. In the final system, each placeholder seam in `run_benchmark.py` is replaced by the real module CLI/function call while preserving the same JSON contracts.
+This produces a real `benchmark_dataset.json`, `verified_predictions.jsonl`, `evaluation_results.json`, and `report_export/` artifacts. Retrieval uses the real matchmaker with the default `sentence-transformers` backend; constrained smoke-test environments may set `CROSSDOC_BENCHMARK_EMBEDDING_BACKEND=keyword-fixture` to exercise the same orchestration contracts without downloading the embedding model. Candidate slots are still explicit: `candidate_1` is the rule-based `MockAdapter` baseline, `candidate_2` uses the live pipeline adapter hook (also `MockAdapter` during Part 9), and `candidate_3`/`candidate_4` are logged as unconfigured placeholder candidate slots until future adapters are added.
 
-### 4. Final integrated module commands represented by the orchestrator
+### 4. Module commands represented by the orchestrator
 
 The orchestrator is written against these documented CLI shapes:
 
 ```bash
 python ingestion.py <file> <master|service>
 python generate_data.py --corpus-dir raw_doc_pairs --num-pairs 60 --master-seed 42 --out benchmark_dataset.json
-python evaluation.py --ground-truth benchmark_dataset.json --predictions verified_predictions.jsonl --out evaluation_results.json
-python report_export.py --eval-results evaluation_results.json --seed seed_manifest.json --dataset-hash <sha256> --out-dir report_export
+python evaluation.py --ground-truth benchmark_dataset.json --predictions verified_predictions.json --out evaluation_results.json
+python report_export.py --eval-results evaluation_results.json --seed <master-seed> --dataset-hash <sha256> --out-dir report_export
 ```
 
-Retrieval and auditor/guardrail modules are also invoked through placeholder seams and are expected to exchange `RetrievalResult` and `VerifiedPrediction` JSON records.
+Retrieval and auditor/guardrail are invoked through stable Python seams in `run_benchmark.py` and exchange `RetrievalResult` and `VerifiedPrediction` JSON-compatible records. The persisted combined prediction log is JSONL for auditability; evaluation loads those records directly in-process.
 
 ## What a publication release package should bundle
 
@@ -72,15 +72,6 @@ A complete reproducibility package should include:
 
 The `dataset_content_hash` field in `seed_manifest.json` should be the SHA-256 hash of the frozen `benchmark_dataset.json`. Reviewers should recompute the hash and compare it to the manifest before trusting downstream evaluation results.
 
-## Future wiring design note
+## Wiring maintenance note
 
-Future engineers should replace the body, not the signature, of each placeholder function in `run_benchmark.py`:
-
-- `call_ingestion_module`: call Part 1's `python ingestion.py <file> <doc_type>` and store ParsedDocument JSON.
-- `call_dataset_generator`: call the dataset generator CLI and write `benchmark_dataset.json`.
-- `call_retrieval_module`: call the retrieval module and consume/produce `RetrievalResult` JSON.
-- `call_auditor_guardrail_module`: call the auditor+guardrail module and return `VerifiedPrediction` records.
-- `call_evaluation_module`: call the evaluator and write `evaluation_results.json`.
-- `call_report_export_module`: call report export with the evaluation path, seed manifest, dataset hash, and output directory.
-
-Keeping those seams stable allows the top-level pipeline to remain reproducible while individual modules evolve independently.
+Future engineers should preserve the signatures of the `call_*` functions in `run_benchmark.py` when swapping implementation details. This keeps the top-level pipeline reproducible while individual modules and candidate adapters evolve independently.

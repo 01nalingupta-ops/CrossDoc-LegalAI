@@ -1,4 +1,4 @@
-"""Top-level placeholder orchestrator for CrossDoc-LegalAI benchmark reproduction.
+"""Top-level orchestrator for CrossDoc-LegalAI benchmark reproduction.
 
 Design note for future integration
 ==================================
@@ -16,13 +16,14 @@ outputs so the top-level JSON contracts remain stable:
 * ``call_report_export_module`` -> ``python report_export.py --eval-results ... --seed ...
   --dataset-hash ... --out-dir ...``.
 
-Running this file today uses mock JSON outputs and logs every placeholder call.
+Dry-run mode logs the planned sequence without side effects; normal runs call the real modules.
 """
 from __future__ import annotations
 
 import argparse
 import hashlib
 import json
+import os
 from pathlib import Path
 from typing import Any, Sequence
 
@@ -70,7 +71,7 @@ def run_benchmark(args: argparse.Namespace) -> int:
 
     report_dir = out_dir / "report_export"
     call_report_export_module(eval_path, manifest_path, manifest["dataset_content_hash"], report_dir)
-    print("[ORCH] Placeholder benchmark pipeline complete.")
+    print("[ORCH] Benchmark pipeline complete.")
     return 0
 
 
@@ -78,16 +79,16 @@ def build_plan(args: argparse.Namespace) -> list[str]:
     manifest_source = args.seed_manifest or f"generate with master_seed={args.master_seed}, num_pairs={args.num_pairs}"
     steps = [
         f"Generate/load seed manifest ({manifest_source})",
-        f"[PLACEHOLDER] Ingest documents from {args.corpus_dir} via: python ingestion.py <file> <master|service>",
-        "[PLACEHOLDER] Generate benchmark_dataset.json via: python generate_data.py --corpus-dir ... --num-pairs ... --master-seed ...",
+        f"Ingest documents from {args.corpus_dir} via: python ingestion.py <file> <master|service>",
+        "Generate benchmark_dataset.json via: python generate_data.py --corpus-dir ... --num-pairs ... --master-seed ...",
     ]
     for model_slot in MODEL_SLOTS:
-        steps.append(f"[PLACEHOLDER] {model_slot}: call retrieval module to produce RetrievalResult records")
-        steps.append(f"[PLACEHOLDER] {model_slot}: call auditor+guardrail module to produce VerifiedPrediction records")
+        steps.append(f"{model_slot}: call retrieval module to produce RetrievalResult records")
+        steps.append(f"{model_slot}: call auditor+guardrail module to produce VerifiedPrediction records")
     steps.extend(
         [
-            "[PLACEHOLDER] Evaluate predictions via: python evaluation.py --ground-truth ... --predictions ... --out ...",
-            "[PLACEHOLDER] Export report via: python report_export.py --eval-results ... --seed ... --dataset-hash ... --out-dir ...",
+            "Evaluate predictions via: python evaluation.py --ground-truth ... --predictions ... --out ...",
+            "Export report via: python report_export.py --eval-results ... --seed ... --dataset-hash ... --out-dir ...",
         ]
     )
     return steps
@@ -107,53 +108,27 @@ def load_or_generate_manifest(args: argparse.Namespace) -> dict[str, Any]:
 
 
 def call_ingestion_module(corpus_dir: Path, parsed_dir: Path) -> list[dict[str, Any]]:
-    """PLACEHOLDER — replace with real ``python ingestion.py <file> <doc_type>`` calls."""
-    print("[PLACEHOLDER] Ingestion module: would parse files into ParsedDocument JSON records.")
+    """Parse corpus documents with the real Part 1 ingestion module."""
+    import ingestion
+
+    print("[ORCH] Ingestion module: parsing source corpus documents.")
     parsed_dir.mkdir(parents=True, exist_ok=True)
-    documents = []
-    files = sorted(path for path in corpus_dir.glob("**/*") if path.is_file()) if corpus_dir.exists() else []
-    if not files:
-        files = [corpus_dir / "mock_master.txt", corpus_dir / "mock_service.txt"]
-    for index, path in enumerate(files, start=1):
-        doc_type = "master" if index % 2 else "service"
-        parsed = {
-            "doc_id": f"mock-doc-{index:04d}",
-            "doc_type": doc_type,
-            "source_path": str(path),
-            "full_text": f"Placeholder parsed text for {path.name}",
-            "page_count": 1,
-            "extraction_method": "digital",
-            "chunks": [
-                {
-                    "chunk_id": f"mock-doc-{index:04d}-chunk-0001",
-                    "text": f"Placeholder parsed text for {path.name}",
-                    "char_start": 0,
-                    "char_end": len(f"Placeholder parsed text for {path.name}"),
-                    "page_num": 1,
-                    "overlap_chars": 150,
-                }
-            ],
-        }
-        (parsed_dir / f"{parsed['doc_id']}.json").write_text(json.dumps(parsed, indent=2) + "\n", encoding="utf-8")
+    documents: list[dict[str, Any]] = []
+    files = sorted(path for path in corpus_dir.glob("**/*") if path.is_file() and path.suffix.lower() in {".pdf", ".docx", ".txt"})
+    for path in files:
+        doc_type = _infer_doc_type(path)
+        parsed = ingestion.parse_document(str(path), doc_type)
+        (parsed_dir / f"{parsed['doc_id']}.json").write_text(json.dumps(parsed, indent=2, sort_keys=True) + "\n", encoding="utf-8")
         documents.append(parsed)
     return documents
 
 
 def call_dataset_generator(corpus_dir: Path, num_pairs: int, manifest: dict[str, Any], out_path: Path) -> list[dict[str, Any]]:
-    """PLACEHOLDER — replace with real dataset-generation CLI/function call."""
-    print("[PLACEHOLDER] Dataset generator: would create benchmark_dataset.json from corpus and seeds.")
-    dataset = [
-        {
-            "pair_id": f"mock-pair-{i + 1:04d}",
-            "master_doc_id": "mock-doc-0001",
-            "service_doc_id": "mock-doc-0002",
-            "label": "clean" if i % 2 == 0 else "defect",
-            "severity": "none" if i % 2 == 0 else "medium",
-            "seed": manifest["dataset_generation_seeds"][i] if i < len(manifest["dataset_generation_seeds"]) else None,
-        }
-        for i in range(num_pairs)
-    ]
-    out_path.write_text(json.dumps(dataset, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    """Generate benchmark_dataset.json with the real Part 3 generator."""
+    from generate_data import generate_dataset
+
+    print("[ORCH] Dataset generator: creating benchmark_dataset.json from corpus templates.")
+    dataset, _fragment = generate_dataset(corpus_dir, num_pairs, manifest["master_seed"], out_path)
     return dataset
 
 
@@ -164,17 +139,20 @@ def call_retrieval_module(
     manifest: dict[str, Any],
     out_path: Path,
 ) -> list[dict[str, Any]]:
-    """PLACEHOLDER — replace with the retrieval module's RetrievalResult-producing call."""
-    print(f"[PLACEHOLDER] Retrieval module for {model_slot}: would produce RetrievalResult records.")
-    results = [
-        {
-            "pair_id": item["pair_id"],
-            "model_slot": model_slot,
-            "retrieved_chunk_ids": [parsed_documents[0]["chunks"][0]["chunk_id"]] if parsed_documents else [],
-            "retrieval_tiebreak_seed": manifest["retrieval_tiebreak_seed"],
-        }
-        for item in dataset
-    ]
+    """Produce RetrievalResult records with the real Part 2 matchmaker."""
+    import ingestion
+    import matchmaker
+
+    print(f"[ORCH] Retrieval module for {model_slot}: producing RetrievalResult records.")
+    parsed_by_path = {Path(doc["source_path"]).resolve(): doc for doc in parsed_documents}
+    results: list[dict[str, Any]] = []
+    embedder = _configured_benchmark_embedder(matchmaker)
+    for item in dataset:
+        master_doc = _parsed_for_path(Path(item["master_doc_path"]), "master", parsed_by_path, ingestion)
+        service_doc = _parsed_for_path(Path(item["service_doc_path"]), "service", parsed_by_path, ingestion)
+        retrieval = matchmaker.retrieve_pair(master_doc, service_doc, embedder=embedder)
+        record = {"pair_id": item["pair_id"], "model_slot": model_slot, "retrieval_results": retrieval, "retrieval_tiebreak_seed": manifest["retrieval_tiebreak_seed"]}
+        results.append(record)
     with out_path.open("w", encoding="utf-8") as handle:
         for result in results:
             handle.write(json.dumps(result, sort_keys=True) + "\n")
@@ -187,49 +165,98 @@ def call_auditor_guardrail_module(
     retrieval_results: list[dict[str, Any]],
     manifest: dict[str, Any],
 ) -> list[dict[str, Any]]:
-    """PLACEHOLDER — replace with the auditor+guardrail module's VerifiedPrediction call."""
-    print(f"[PLACEHOLDER] Auditor+guardrail for {model_slot}: would produce VerifiedPrediction records.")
-    return [
-        {
-            "pair_id": item["pair_id"],
-            "model_slot": model_slot,
-            "predicted_label": "clean",
-            "confidence": 0.5,
-            "guardrail_status": "placeholder_not_evaluated",
-            "retrieval_result": retrieval_results[index],
-        }
-        for index, item in enumerate(dataset)
-    ]
+    """Produce one pair-level VerifiedPrediction per dataset pair through Part 4 guardrail."""
+    import ingestion
+    import auditor_guardrail
+    from model_adapter import MockAdapter
+    from pipeline_live import get_auditor_adapter
+
+    if model_slot in {"candidate_3", "candidate_4"}:
+        print(f"[ORCH] Auditor+guardrail for {model_slot}: adapter not configured; logging placeholder negatives.")
+        return [_placeholder_prediction(item, model_slot, retrieval_results[index]) for index, item in enumerate(dataset)]
+
+    adapter = MockAdapter() if model_slot == "candidate_1" else get_auditor_adapter()
+    print(f"[ORCH] Auditor+guardrail for {model_slot}: using {adapter.model_id}.")
+    predictions: list[dict[str, Any]] = []
+    for item, retrieval_record in zip(dataset, retrieval_results):
+        master_doc = ingestion.parse_document(item["master_doc_path"], "master")
+        service_doc = ingestion.parse_document(item["service_doc_path"], "service")
+        chunk_predictions = [
+            auditor_guardrail.run_auditor_and_guardrail(result, master_doc["full_text"], service_doc["full_text"], adapter, item["pair_id"])
+            for result in retrieval_record["retrieval_results"]
+        ]
+        best = _select_pair_prediction(chunk_predictions)
+        best["model_id"] = model_slot
+        best["adapter_model_id"] = adapter.model_id
+        best["model_slot"] = model_slot
+        predictions.append(best)
+    return predictions
 
 
 def call_evaluation_module(dataset_path: Path, predictions_path: Path, out_path: Path, manifest: dict[str, Any]) -> dict[str, Any]:
-    """PLACEHOLDER — replace with real ``python evaluation.py --ground-truth ...`` call."""
-    print("[PLACEHOLDER] Evaluation module: would compute metrics and statistical tests.")
-    results = {
-        "per_model_metrics": {slot: {"accuracy": None, "f1": None, "auc": None} for slot in MODEL_SLOTS},
-        "pairwise_tests": {"mcnemar": [], "delong": []},
-        "bootstrap_resampling_seed": manifest["bootstrap_resampling_seed"],
-        "ground_truth_path": str(dataset_path),
-        "predictions_path": str(predictions_path),
-    }
+    """Compute metrics with the real Part 5 evaluation module."""
+    from evaluation import evaluate
+
+    print("[ORCH] Evaluation module: computing metrics and statistical tests.")
+    ground_truth = json.loads(dataset_path.read_text(encoding="utf-8"))
+    predictions = [json.loads(line) for line in predictions_path.read_text(encoding="utf-8").splitlines() if line.strip()]
+    results = evaluate(ground_truth, predictions, bootstrap_resamples=100, seed=manifest["bootstrap_resampling_seed"])
     out_path.write_text(json.dumps(results, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     return results
 
 
 def call_report_export_module(eval_path: Path, seed_manifest_path: Path, dataset_hash: str, out_dir: Path) -> None:
-    """PLACEHOLDER — replace with real ``python report_export.py --eval-results ...`` call."""
-    print("[PLACEHOLDER] Report export module: would create figures/tables with seed and dataset hash in filenames.")
-    out_dir.mkdir(parents=True, exist_ok=True)
-    summary = {
-        "eval_results": str(eval_path),
-        "seed_manifest": str(seed_manifest_path),
-        "dataset_content_hash": dataset_hash,
-        "note": "Placeholder report export summary.",
-    }
-    (out_dir / f"placeholder_report_{dataset_hash[:12]}.json").write_text(
-        json.dumps(summary, indent=2, sort_keys=True) + "\n", encoding="utf-8"
-    )
+    """Export report artifacts with the real Part 6 report exporter."""
+    from report_export import export_report
 
+    print("[ORCH] Report export module: creating figures/tables with seed and dataset hash in filenames.")
+    manifest = json.loads(seed_manifest_path.read_text(encoding="utf-8"))
+    eval_results = json.loads(eval_path.read_text(encoding="utf-8"))
+    export_report(eval_results, manifest["master_seed"], dataset_hash, out_dir)
+
+
+def _configured_benchmark_embedder(matchmaker_module: Any) -> Any:
+    backend = os.environ.get("CROSSDOC_BENCHMARK_EMBEDDING_BACKEND", "sentence-transformers")
+    if backend == "sentence-transformers":
+        return None
+    if backend == "keyword-fixture":
+        return matchmaker_module.KeywordFixtureEmbedder()
+    raise ValueError("CROSSDOC_BENCHMARK_EMBEDDING_BACKEND must be 'sentence-transformers' or 'keyword-fixture'")
+
+
+def _infer_doc_type(path: Path) -> str:
+    name = path.name.lower()
+    return "master" if any(token in name for token in ("msa", "master")) else "service"
+
+
+def _parsed_for_path(path: Path, doc_type: str, parsed_by_path: dict[Path, dict[str, Any]], ingestion_module: Any) -> dict[str, Any]:
+    resolved = path.resolve()
+    if resolved not in parsed_by_path:
+        parsed_by_path[resolved] = ingestion_module.parse_document(str(path), doc_type)
+    return parsed_by_path[resolved]
+
+
+def _select_pair_prediction(predictions: list[dict[str, Any]]) -> dict[str, Any]:
+    severity_rank = {"High": 3, "Medium": 2, "Low": 1, "None": 0}
+    return dict(max(predictions, key=lambda row: (bool(row.get("has_contradiction")), severity_rank.get(row.get("severity", "None"), 0), float(row.get("confidence", 0.0)))))
+
+
+def _placeholder_prediction(item: dict[str, Any], model_slot: str, retrieval_result: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "pair_id": item["pair_id"],
+        "model_id": model_slot,
+        "model_slot": model_slot,
+        "has_contradiction": False,
+        "confidence": 0.0,
+        "severity": "None",
+        "conflict_explanation": "No adapter configured for this candidate slot in Part 9.",
+        "msa_exact_quote": "",
+        "sow_exact_quote": "",
+        "suggested_redline": "",
+        "guardrail_verified": True,
+        "guardrail_action": "passed",
+        "retrieval_result": retrieval_result,
+    }
 
 def sha256_file(path: Path) -> str:
     hasher = hashlib.sha256()
