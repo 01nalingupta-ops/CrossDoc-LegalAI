@@ -18,7 +18,8 @@ The command prints one JSON object with this schema:
           "char_start": integer,
           "char_end": integer,
           "page_num": integer,
-          "overlap_chars": 150
+          "overlap_chars": 150,
+          "clause_heading": "optional nullable heading text when clause boundaries are detected"
         }
       ]
     }
@@ -26,6 +27,9 @@ The command prints one JSON object with this schema:
 PDFs are read with PyMuPDF when available. Digital text is used when any page has an
 extractable text layer; otherwise each page is rendered and passed to pytesseract OCR.
 TXT and DOCX inputs are supported as convenience formats.
+
+Changelog:
+    Part 11 adds clause/heading-aware chunking with unchanged fixed-window fallback.
 """
 from __future__ import annotations
 
@@ -33,6 +37,7 @@ import argparse
 import bisect
 import hashlib
 import json
+import re
 from pathlib import Path
 from typing import Callable, Iterable, Literal, Sequence
 
@@ -78,28 +83,45 @@ def chunk_text(
     chunk_size: int = CHUNK_SIZE,
     overlap_chars: int = OVERLAP_CHARS,
 ) -> list[dict]:
-    """Split text into fixed windows and map each chunk start offset to a page number."""
+    """Split text into clause-aware chunks, falling back to fixed windows when needed."""
     if chunk_size <= 0:
         raise ValueError("chunk_size must be positive")
     if overlap_chars < 0 or overlap_chars >= chunk_size:
         raise ValueError("overlap_chars must be non-negative and smaller than chunk_size")
 
     starts = list(page_starts) or [0]
-    step = chunk_size - overlap_chars
+    clause_ranges = _clause_ranges(full_text)
+    if not clause_ranges:
+        return _fixed_window_chunks(full_text, starts, doc_id, chunk_size, overlap_chars)
+
+    chunks: list[dict] = []
+    for clause_start, clause_end, heading in clause_ranges:
+        for start, end in _fixed_window_ranges(full_text, clause_start, clause_end, chunk_size, overlap_chars):
+            chunks.append(
+                {
+                    "chunk_id": f"{doc_id}-chunk-{len(chunks) + 1:04d}",
+                    "text": full_text[start:end],
+                    "char_start": start,
+                    "char_end": end,
+                    "page_num": _page_for_offset(start, starts),
+                    "overlap_chars": overlap_chars,
+                    "clause_heading": heading,
+                }
+            )
+    return chunks
+
+
+def _fixed_window_chunks(
+    full_text: str,
+    page_starts: Sequence[int],
+    doc_id: str,
+    chunk_size: int,
+    overlap_chars: int,
+) -> list[dict]:
+    """Split text into fixed windows and map each chunk start offset to a page number."""
     chunks: list[dict] = []
 
-    if len(full_text) <= chunk_size:
-        ranges = [(0, len(full_text))]
-    else:
-        ranges = []
-        start = 0
-        while start < len(full_text):
-            end = min(start + chunk_size, len(full_text))
-            ranges.append((start, end))
-            if end == len(full_text):
-                break
-            start += step
-
+    ranges = _fixed_window_ranges(full_text, 0, len(full_text), chunk_size, overlap_chars)
     for index, (start, end) in enumerate(ranges, start=1):
         chunks.append(
             {
@@ -107,11 +129,63 @@ def chunk_text(
                 "text": full_text[start:end],
                 "char_start": start,
                 "char_end": end,
-                "page_num": _page_for_offset(start, starts),
+                "page_num": _page_for_offset(start, page_starts),
                 "overlap_chars": overlap_chars,
             }
         )
     return chunks
+
+
+def _fixed_window_ranges(
+    full_text: str,
+    range_start: int,
+    range_end: int,
+    chunk_size: int,
+    overlap_chars: int,
+) -> list[tuple[int, int]]:
+    """Return fixed-window ranges within ``range_start`` and ``range_end``."""
+    text_length = range_end - range_start
+    if text_length <= chunk_size:
+        return [(range_start, range_end)]
+
+    step = chunk_size - overlap_chars
+    ranges: list[tuple[int, int]] = []
+    start = range_start
+    while start < range_end:
+        end = min(start + chunk_size, range_end)
+        ranges.append((start, end))
+        if end == range_end:
+            break
+        start += step
+    return ranges
+
+
+_NUMBERED_HEADING_RE = re.compile(r"^\s*(?:\d+(?:\.\d+)*[.)]?|[A-Z][.)]|\([a-zA-Z0-9]+\))\s+\S+")
+_ALL_CAPS_HEADING_RE = re.compile(r"^\s*[A-Z][A-Z0-9 &,;:'\"()/-]{2,}\s*$")
+
+
+def _clause_ranges(full_text: str) -> list[tuple[int, int, str | None]]:
+    """Detect clause/section ranges from common legal-document heading patterns."""
+    headings: list[tuple[int, str]] = []
+    offset = 0
+    for line in full_text.splitlines(keepends=True):
+        stripped = line.strip()
+        if stripped and (_NUMBERED_HEADING_RE.match(line) or _ALL_CAPS_HEADING_RE.match(line)):
+            headings.append((offset, stripped))
+        offset += len(line)
+
+    if not headings:
+        return []
+
+    ranges: list[tuple[int, int, str | None]] = []
+    first_heading_start = headings[0][0]
+    if full_text[:first_heading_start].strip():
+        ranges.append((0, first_heading_start, None))
+
+    for index, (start, heading) in enumerate(headings):
+        end = headings[index + 1][0] if index + 1 < len(headings) else len(full_text)
+        ranges.append((start, end, heading))
+    return ranges
 
 
 def _extract_text(path: Path) -> tuple[str, list[int], int, ExtractionMethod]:

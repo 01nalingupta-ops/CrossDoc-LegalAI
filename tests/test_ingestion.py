@@ -89,3 +89,47 @@ def test_text_shorter_than_one_chunk_produces_one_chunk():
             "overlap_chars": 150,
         }
     ]
+
+
+def test_numbered_clauses_align_to_clause_boundaries():
+    text = "1. Payment Terms\nFees are due within 30 days.\n2. Termination\nEither party may terminate for breach."
+
+    chunks = chunk_text(text, [0], "doc")
+
+    assert [chunk["clause_heading"] for chunk in chunks] == ["1. Payment Terms", "2. Termination"]
+    assert chunks[0]["text"] == "1. Payment Terms\nFees are due within 30 days.\n"
+    assert chunks[0]["char_start"] == 0
+    assert chunks[0]["char_end"] == text.index("2. Termination")
+    assert chunks[1]["text"] == "2. Termination\nEither party may terminate for breach."
+    assert chunks[1]["char_start"] == text.index("2. Termination")
+    assert chunks[1]["page_num"] == 1
+
+
+def test_all_caps_headings_create_clause_chunks():
+    text = "RECITALS\nThe parties agree to the background facts.\nCONFIDENTIALITY\nRecipient protects information."
+
+    chunks = chunk_text(text, [0], "doc")
+
+    assert len(chunks) == 2
+    assert chunks[0]["clause_heading"] == "RECITALS"
+    assert chunks[0]["text"].startswith("RECITALS\n")
+    assert chunks[1]["clause_heading"] == "CONFIDENTIALITY"
+    assert chunks[1]["char_start"] == text.index("CONFIDENTIALITY")
+
+
+def test_unstructured_text_fallback_output_is_unchanged():
+    text = "plain unstructured text " * 80
+
+    chunks = chunk_text(text, [0], "doc")
+
+    assert "clause_heading" not in chunks[0]
+    assert chunks[0] == {
+        "chunk_id": "doc-chunk-0001",
+        "text": text[:CHUNK_SIZE],
+        "char_start": 0,
+        "char_end": CHUNK_SIZE,
+        "page_num": 1,
+        "overlap_chars": OVERLAP_CHARS,
+    }
+    assert chunks[1]["char_start"] == CHUNK_SIZE - OVERLAP_CHARS
+    assert "clause_heading" not in chunks[1]
