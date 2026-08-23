@@ -14,7 +14,8 @@ def make_pdf(path: Path, pages: list[str]) -> None:
     doc = fitz.open()
     for text in pages:
         page = doc.new_page()
-        page.insert_text((72, 72), text, fontsize=11)
+        rect = fitz.Rect(72, 72, page.rect.width - 72, page.rect.height - 72)
+        page.insert_textbox(rect, text, fontsize=11)
     doc.save(path)
     doc.close()
 
@@ -47,8 +48,8 @@ def test_short_digital_text_pdf(tmp_path):
 
 def test_multi_page_digital_pdf_chunk_page_numbers(tmp_path):
     pdf = tmp_path / "multi.pdf"
-    page1 = "A" * 700
-    page2 = "B" * 700
+    page1 = "A" * 1000
+    page2 = "B" * 1000
     make_pdf(pdf, [page1, page2])
 
     parsed = parse_document(str(pdf), "service")
