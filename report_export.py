@@ -19,6 +19,8 @@ from typing import Any
 import numpy as np
 
 if importlib.util.find_spec("matplotlib") is not None:
+    import matplotlib
+    matplotlib.use("Agg")
     import matplotlib.pyplot as plt
     from matplotlib.patches import Rectangle
 else:
