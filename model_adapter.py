@@ -14,6 +14,8 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Any, Callable
 
+import numeric_reasoning
+
 
 AUDITOR_PROMPT_TEMPLATE = """You are CrossDoc-LegalAI Auditor Agent (LangGraph Node 2).
 
@@ -37,6 +39,9 @@ Service chunk:
 
 Matched Master chunks:
 {master_chunks_json}
+
+Additional numeric evidence (advisory only; do not quote from this section):
+{numeric_evidence_json}
 """
 
 
@@ -70,34 +75,44 @@ class LocalNLIAdapter(AuditorModelAdapter):
         self._pipeline = nli_pipeline
 
     def judge(self, service_chunk_text: str, master_chunks: list[dict[str, Any]]) -> dict[str, Any]:
+        numeric_evidence = numeric_evidence_for_clause(service_chunk_text, master_chunks)
         if not master_chunks:
-            return _prediction(False, 0.0, "None", "No matched master clause was available for local NLI comparison.", "", "", "")
+            return _with_numeric_evidence(
+                _prediction(False, 0.0, "None", "No matched master clause was available for local NLI comparison.", "", "", ""),
+                numeric_evidence,
+            )
 
         scored = [self._score_chunk(service_chunk_text, chunk) for chunk in master_chunks]
         best = max(scored, key=lambda row: (row["contradiction_probability"], row["master_chunk_id"]))
         confidence = float(best["contradiction_probability"])
         has_contradiction = confidence > float(self.config["contradiction_threshold"])
         if not has_contradiction:
-            return _prediction(
-                False,
-                confidence,
-                "None",
-                f"Local NLI classified the strongest matched clause as non-contradictory with contradiction confidence {confidence:.3f}.",
-                "",
-                "",
-                "",
+            return _with_numeric_evidence(
+                _prediction(
+                    False,
+                    confidence,
+                    "None",
+                    f"Local NLI classified the strongest matched clause as non-contradictory with contradiction confidence {confidence:.3f}.",
+                    "",
+                    "",
+                    "",
+                ),
+                numeric_evidence,
             )
 
         severity = _severity_for_confidence(confidence, self.config["severity_bands"])
         master_text = best["master_chunk_text"]
-        return _prediction(
-            True,
-            confidence,
-            severity,
-            f"Local NLI classified the matched master/service clauses as contradiction with confidence {confidence:.3f}.",
-            master_text,
-            service_chunk_text,
-            f"Revise the service clause to align with the matched master clause: {master_text}",
+        return _with_numeric_evidence(
+            _prediction(
+                True,
+                confidence,
+                severity,
+                f"Local NLI classified the matched master/service clauses as contradiction with confidence {confidence:.3f}.",
+                master_text,
+                service_chunk_text,
+                f"Revise the service clause to align with the matched master clause: {master_text}",
+            ),
+            numeric_evidence,
         )
 
     def _score_chunk(self, service_chunk_text: str, master_chunk: dict[str, Any]) -> dict[str, Any]:
@@ -152,6 +167,9 @@ class OpenAICompatibleAdapter(AuditorModelAdapter):
         prompt = AUDITOR_PROMPT_TEMPLATE.format(
             service_chunk_text=service_chunk_text,
             master_chunks_json=json.dumps(master_chunks, indent=2, sort_keys=True),
+            numeric_evidence_json=json.dumps(
+                numeric_evidence_for_clause(service_chunk_text, master_chunks), indent=2, sort_keys=True
+            ),
         )
         payload = {
             "model": self.model,
@@ -185,6 +203,17 @@ class MockAdapter(AuditorModelAdapter):
         if "liability" in lower and "uncapped" in lower:
             return _prediction(True, 0.89, "High", "The SOW makes liability uncapped despite the MSA cap.", "Supplier's aggregate liability is capped at fees paid in the prior twelve months.", "Supplier's liability is uncapped for all claims under this SOW.", "Supplier's aggregate liability is capped at fees paid in the prior twelve months.")
         return _prediction(False, 0.86, "None", "No contradiction was identified in the matched clauses.", "", "", "")
+
+
+
+def numeric_evidence_for_clause(service_chunk_text: str, master_chunks: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Return advisory numeric evidence for an adapter clause comparison."""
+    retrieval_result = {"service_chunk_text": service_chunk_text, "matched_master_chunks": master_chunks}
+    return numeric_reasoning.evidence_for_retrieval_result(retrieval_result)
+
+
+def _with_numeric_evidence(prediction: dict[str, Any], evidence: list[dict[str, Any]]) -> dict[str, Any]:
+    return {**prediction, "numeric_evidence": evidence}
 
 
 def _load_local_nli_config(config_path: Path) -> dict[str, Any]:

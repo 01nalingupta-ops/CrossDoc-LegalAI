@@ -168,6 +168,7 @@ def call_auditor_guardrail_module(
     """Produce one pair-level VerifiedPrediction per dataset pair through Part 4 guardrail."""
     import ingestion
     import auditor_guardrail
+    import numeric_reasoning
     from model_adapter import MockAdapter
     from pipeline_live import get_auditor_adapter
 
@@ -181,10 +182,13 @@ def call_auditor_guardrail_module(
     for item, retrieval_record in zip(dataset, retrieval_results):
         master_doc = ingestion.parse_document(item["master_doc_path"], "master")
         service_doc = ingestion.parse_document(item["service_doc_path"], "service")
-        chunk_predictions = [
-            auditor_guardrail.run_auditor_and_guardrail(result, master_doc["full_text"], service_doc["full_text"], adapter, item["pair_id"])
-            for result in retrieval_record["retrieval_results"]
-        ]
+        chunk_predictions = []
+        for result in retrieval_record["retrieval_results"]:
+            chunk_prediction = auditor_guardrail.run_auditor_and_guardrail(
+                result, master_doc["full_text"], service_doc["full_text"], adapter, item["pair_id"]
+            )
+            chunk_prediction["numeric_evidence"] = numeric_reasoning.evidence_for_retrieval_result(result)
+            chunk_predictions.append(chunk_prediction)
         best = _select_pair_prediction(chunk_predictions)
         best["model_id"] = model_slot
         best["adapter_model_id"] = adapter.model_id

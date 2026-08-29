@@ -36,12 +36,16 @@ from __future__ import annotations
 import argparse
 import json
 import math
+import re
+from collections import Counter
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Protocol, Sequence
 
 EMBEDDING_MODEL_NAME = "all-MiniLM-L6-v2"
 DEFAULT_TOP_K = 2
+DEFAULT_USE_HYBRID = False
+DEFAULT_HYBRID_LEXICAL_WEIGHT = 0.35
 
 
 class EmbeddingModel(Protocol):
@@ -98,39 +102,84 @@ class Match:
     similarity: float
 
 
+@dataclass(frozen=True)
+class RetrievalScoringConfig:
+    """Configurable weighting for optional hybrid retrieval scoring."""
+
+    lexical_weight: float = DEFAULT_HYBRID_LEXICAL_WEIGHT
+
+    @property
+    def semantic_weight(self) -> float:
+        return 1.0 - self.lexical_weight
+
+
 class InMemoryCosineIndex:
     """Swappable master-chunk-only cosine index with cached master embeddings."""
 
-    def __init__(self, chunks: Sequence[dict], embeddings: Sequence[Sequence[float]], embedder: EmbeddingModel) -> None:
+    def __init__(
+        self,
+        chunks: Sequence[dict],
+        embeddings: Sequence[Sequence[float]],
+        embedder: EmbeddingModel,
+        scoring_config: RetrievalScoringConfig | None = None,
+    ) -> None:
         if len(chunks) != len(embeddings):
             raise ValueError("chunks and embeddings must have identical lengths")
         self.chunks = list(chunks)
         self.embeddings = [_normalize(vector) for vector in embeddings]
         self.embedder = embedder
+        self.scoring_config = scoring_config or RetrievalScoringConfig()
+        _validate_weight(self.scoring_config.lexical_weight, "lexical_weight")
+        self._lexical_scorer = LexicalScorer(self.chunks)
 
-    def search(self, query_texts: Sequence[str], top_k: int = DEFAULT_TOP_K) -> list[list[Match]]:
+    def search(
+        self,
+        query_texts: Sequence[str],
+        top_k: int = DEFAULT_TOP_K,
+        use_hybrid: bool = DEFAULT_USE_HYBRID,
+    ) -> list[list[Match]]:
         if top_k <= 0:
             raise ValueError("top_k must be positive")
-        query_embeddings = [_normalize(vector) for vector in self.embedder.encode(list(query_texts))]
+        query_texts = list(query_texts)
+        query_embeddings = [_normalize(vector) for vector in self.embedder.encode(query_texts)]
         results: list[list[Match]] = []
-        for query in query_embeddings:
-            scored = [Match(chunk, _cosine(query, master_vector)) for chunk, master_vector in zip(self.chunks, self.embeddings)]
+        for query_text, query_embedding in zip(query_texts, query_embeddings):
+            semantic_scores = [_cosine(query_embedding, master_vector) for master_vector in self.embeddings]
+            if use_hybrid:
+                lexical_scores = self._lexical_scorer.score(query_text)
+                scores = [
+                    self.scoring_config.semantic_weight * semantic_score
+                    + self.scoring_config.lexical_weight * lexical_score
+                    for semantic_score, lexical_score in zip(semantic_scores, lexical_scores)
+                ]
+            else:
+                scores = semantic_scores
+            scored = [Match(chunk, score) for chunk, score in zip(self.chunks, scores)]
             scored.sort(key=lambda item: (-item.similarity, item.chunk.get("chunk_id", "")))
             results.append(scored[: min(top_k, len(scored))])
         return results
 
 
-def build_master_index(master_doc: dict, embedder: EmbeddingModel | None = None) -> InMemoryCosineIndex:
+def build_master_index(
+    master_doc: dict,
+    embedder: EmbeddingModel | None = None,
+    scoring_config: RetrievalScoringConfig | None = None,
+) -> InMemoryCosineIndex:
     """Embed and index only the Master ParsedDocument chunks once."""
     _validate_parsed_document(master_doc, expected_doc_type="master")
     model = embedder or SentenceTransformerEmbedder()
     chunks = list(master_doc["chunks"])
     texts = [chunk["text"] for chunk in chunks]
     embeddings = model.encode(texts)
-    return InMemoryCosineIndex(chunks=chunks, embeddings=embeddings, embedder=model)
+    return InMemoryCosineIndex(chunks=chunks, embeddings=embeddings, embedder=model, scoring_config=scoring_config)
 
 
-def retrieve_for_service_doc(index: InMemoryCosineIndex, service_doc: dict, top_k: int = DEFAULT_TOP_K) -> list[dict]:
+def retrieve_for_service_doc(
+    index: InMemoryCosineIndex,
+    service_doc: dict,
+    top_k: int = DEFAULT_TOP_K,
+    use_hybrid: bool = DEFAULT_USE_HYBRID,
+) -> list[dict]:
     """Return top-k matched master chunks for every Service ParsedDocument chunk."""
     _validate_parsed_document(service_doc, expected_doc_type="service")
     if top_k != DEFAULT_TOP_K:
@@ -140,7 +189,7 @@ def retrieve_for_service_doc(index: InMemoryCosineIndex, service_doc: dict, top_
             raise ValueError("top_k must be positive")
     service_chunks = list(service_doc["chunks"])
     service_texts = [chunk["text"] for chunk in service_chunks]
-    matches_by_query = index.search(service_texts, top_k=top_k)
+    matches_by_query = index.search(service_texts, top_k=top_k, use_hybrid=use_hybrid)
     output: list[dict] = []
     for service_chunk, matches in zip(service_chunks, matches_by_query):
         output.append(
@@ -165,6 +214,48 @@ def retrieve_pair(master_doc: dict, service_doc: dict, embedder: EmbeddingModel 
     return retrieve_for_service_doc(build_master_index(master_doc, embedder=embedder), service_doc, top_k=DEFAULT_TOP_K)
 
 
+class LexicalScorer:
+    """Small BM25-style scorer over the already-indexed master chunks."""
+
+    _k1 = 1.2
+    _b = 0.75
+
+    def __init__(self, chunks: Sequence[dict]) -> None:
+        self._chunk_tokens = [_tokenize(chunk["text"]) for chunk in chunks]
+        self._term_counts = [Counter(tokens) for tokens in self._chunk_tokens]
+        self._doc_count = len(chunks)
+        self._avg_doc_len = (
+            sum(len(tokens) for tokens in self._chunk_tokens) / self._doc_count if self._doc_count else 0.0
+        )
+        document_frequencies: Counter[str] = Counter()
+        for tokens in self._chunk_tokens:
+            document_frequencies.update(set(tokens))
+        self._idf = {
+            term: math.log(1.0 + (self._doc_count - frequency + 0.5) / (frequency + 0.5))
+            for term, frequency in document_frequencies.items()
+        }
+
+    def score(self, query_text: str) -> list[float]:
+        query_terms = set(_tokenize(query_text))
+        if not query_terms:
+            return [0.0 for _ in self._term_counts]
+        raw_scores = [self._score_chunk(query_terms, counts, sum(counts.values())) for counts in self._term_counts]
+        max_score = max(raw_scores, default=0.0)
+        if max_score <= 0.0:
+            return [0.0 for _ in raw_scores]
+        return [score / max_score for score in raw_scores]
+
+    def _score_chunk(self, query_terms: set[str], counts: Counter[str], doc_len: int) -> float:
+        score = 0.0
+        length_norm = 1.0 - self._b + self._b * (doc_len / self._avg_doc_len if self._avg_doc_len else 0.0)
+        for term in query_terms:
+            frequency = counts.get(term, 0)
+            if frequency == 0:
+                continue
+            denominator = frequency + self._k1 * length_norm
+            score += self._idf.get(term, 0.0) * (frequency * (self._k1 + 1.0) / denominator)
+        return score
+
 def _validate_parsed_document(document: dict, expected_doc_type: str) -> None:
     if not isinstance(document, dict):
         raise ValueError("ParsedDocument must be a JSON object")
@@ -180,6 +271,15 @@ def _validate_parsed_document(document: dict, expected_doc_type: str) -> None:
             raise ValueError(f"chunk {index}.chunk_id must be a non-empty string")
         if not isinstance(chunk.get("text"), str):
             raise ValueError(f"chunk {index}.text must be a string")
+
+
+def _tokenize(text: str) -> list[str]:
+    return re.findall(r"[a-z0-9]+", text.lower())
+
+
+def _validate_weight(value: float, name: str) -> None:
+    if not 0.0 <= value <= 1.0:
+        raise ValueError(f"{name} must be between 0.0 and 1.0")
 
 
 def _normalize(vector: Sequence[float]) -> list[float]:
