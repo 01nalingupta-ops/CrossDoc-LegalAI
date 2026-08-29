@@ -162,6 +162,10 @@ def _fixed_window_ranges(
 
 _NUMBERED_HEADING_RE = re.compile(r"^\s*(?:\d+(?:\.\d+)*[.)]?|[A-Z][.)]|\([a-zA-Z0-9]+\))\s+\S+")
 _ALL_CAPS_HEADING_RE = re.compile(r"^\s*[A-Z][A-Z0-9 &,;:'\"()/-]{2,}\s*$")
+_BRACKET_TAG_HEADING_RE = re.compile(r"^\[[\w-]+\]\s+\S")
+
+
+_REPEATED_CHAR_RE = re.compile(r"^(.)\1*$")
 
 
 def _clause_ranges(full_text: str) -> list[tuple[int, int, str | None]]:
@@ -170,7 +174,11 @@ def _clause_ranges(full_text: str) -> list[tuple[int, int, str | None]]:
     offset = 0
     for line in full_text.splitlines(keepends=True):
         stripped = line.strip()
-        if stripped and (_NUMBERED_HEADING_RE.match(line) or _ALL_CAPS_HEADING_RE.match(line)):
+        if stripped and (
+            _NUMBERED_HEADING_RE.match(line)
+            or (_ALL_CAPS_HEADING_RE.match(line) and not _REPEATED_CHAR_RE.match(stripped))
+            or _BRACKET_TAG_HEADING_RE.match(line)
+        ):
             headings.append((offset, stripped))
         offset += len(line)
 

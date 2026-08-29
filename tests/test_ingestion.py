@@ -117,6 +117,23 @@ def test_all_caps_headings_create_clause_chunks():
     assert chunks[1]["char_start"] == text.index("CONFIDENTIALITY")
 
 
+def test_bracket_tag_clause_headings_prevent_mid_word_truncation():
+    text = (
+        "Fictional Alpha Master Services Agreement\n"
+        "[payment_terms] Payment Terms: Client will pay undisputed invoices within thirty (30) days after receipt.\n"
+        "[confidentiality_scope] Confidentiality Scope: Confidentiality obligations are mutual and survive for three (3) years after disclosure.\n"
+        "[indemnification] Indemnification: Each party will indemnify the other for third-party claims caused by its negligence, misconduct, or IP infringement.\n"
+    )
+
+    chunks = chunk_text(text, [0], "doc")
+
+    confidentiality_chunk = next(
+        c for c in chunks if c["clause_heading"] and c["clause_heading"].startswith("[confidentiality_scope]")
+    )
+    assert confidentiality_chunk["text"].startswith("[confidentiality_scope]")
+    assert not confidentiality_chunk["text"].startswith("entiality_scope]")
+
+
 def test_unstructured_text_fallback_output_is_unchanged():
     text = "plain unstructured text " * 80
 
