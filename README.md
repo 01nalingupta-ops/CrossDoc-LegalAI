@@ -210,7 +210,7 @@ class AuditorModelAdapter(ABC):
         ...
 ```
 
-Adapters receive the Service chunk text and the list of matched Master chunks from the retrieval result. They return the raw Auditor schema:
+Adapters receive the Service chunk text and the list of matched Master chunks from the retrieval result. They return the raw Auditor schema. Adapters may also include additive advisory fields such as `numeric_evidence`, but guardrail decisions only use the raw fields below:
 
 ```json
 {
@@ -240,7 +240,7 @@ Every real adapter call sends `temperature=0.0` where the backend exposes a samp
 
 ### Fixed prompt template
 
-The prompt in `AUDITOR_PROMPT_TEMPLATE` asks the model to judge contradictions between a Service/SOW clause and matched Master/MSA clauses, considering these categories: Payment Terms, Liability Cap, IP Ownership, Termination Notice, Governing Jurisdiction, Confidentiality Scope, Indemnification, and Insurance Requirements. It requires exactly the seven raw-output keys above, requires JSON-only output, requires `severity` to be `High`, `Medium`, `Low`, or `None`, and instructs the model to use only verbatim quotes present in the provided chunks.
+The prompt in `AUDITOR_PROMPT_TEMPLATE` asks the model to judge contradictions between a Service/SOW clause and matched Master/MSA clauses, with advisory numeric evidence supplied separately from quoteable source chunks. It considers these categories: Payment Terms, Liability Cap, IP Ownership, Termination Notice, Governing Jurisdiction, Confidentiality Scope, Indemnification, and Insurance Requirements. It requires exactly the seven raw-output keys above, requires JSON-only output, requires `severity` to be `High`, `Medium`, `Low`, or `None`, and instructs the model to use only verbatim quotes present in the provided chunks.
 
 ## Component B: Deterministic Guardrail (LangGraph Node 3)
 
@@ -252,7 +252,7 @@ The prompt in `AUDITOR_PROMPT_TEMPLATE` asks the model to judge contradictions b
 4. If both quote checks pass, the guardrail sets `guardrail_verified=true` and `guardrail_action="passed"`.
 5. If either quote check fails, the module withholds the claim by forcing `has_contradiction=false`, `confidence=0.0`, `severity="None"`, and `suggested_redline=""`, while preserving the explanation and quotes for audit/debug visibility. The guardrail sets `guardrail_verified=false` and `guardrail_action="claim_withheld"`.
 
-The final output schema is exactly:
+The live final output schema is backward-compatible and may include additive evidence/scoring fields:
 
 ```json
 {
@@ -267,11 +267,21 @@ The final output schema is exactly:
   "sow_exact_quote": "string",
   "suggested_redline": "string",
   "guardrail_verified": "boolean",
-  "guardrail_action": "passed | quote_rejected | claim_withheld"
+  "guardrail_action": "passed | quote_rejected | claim_withheld",
+  "numeric_evidence": "array, optional structured numeric evidence",
+  "category": "Payment Terms | Liability Cap | IP Ownership | Termination Notice | Governing Jurisdiction | Confidentiality Scope | Indemnification | Insurance Requirements | Other",
+  "risk_score": "float 0.0-100.0"
 }
 ```
 
 This implementation uses `claim_withheld` for failed verification because the claim is not safe for end users. `quote_rejected` is reserved by the shared schema for consumers that want to represent quote-only rejection separately.
+
+
+## Component C: Clause Classification and Risk Scoring
+
+`clause_classifier.py` classifies live clauses into the eight fixed benchmark categories from `generate_data.DEFECT_CATEGORIES` plus `Other`. `pipeline_live.py` uses this classifier instead of the stub demo's keyword-only `infer_category(...)` helper, while `pipeline_stubs.py` remains unchanged for offline demos.
+
+`risk_scoring.py` computes deterministic `risk_score` values from `severity`, `confidence`, and `category` using `DEFAULT_RISK_CONFIG`, which contains the severity weights, category weights, blend factors, and output scale. The formula is table-driven so weight changes can be made in configuration rather than through inline risk conditionals. These fields are additive on live `VerifiedPrediction` records and do not affect guardrail verification.
 
 ## Pipeline API
 

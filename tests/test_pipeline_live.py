@@ -74,7 +74,9 @@ def test_live_contract_shapes_have_required_keys(monkeypatch):
 
     parsed_keys = {"doc_id", "doc_type", "source_path", "full_text", "page_count", "extraction_method", "chunks"}
     retrieval_keys = {"service_chunk_id", "service_chunk_text", "matched_master_chunks"}
-    prediction_keys = {"pair_id", "model_id", "service_chunk_id", "has_contradiction", "confidence", "severity", "conflict_explanation", "msa_exact_quote", "sow_exact_quote", "suggested_redline", "guardrail_verified", "guardrail_action"}
+    prediction_keys = {"pair_id", "model_id", "service_chunk_id", "has_contradiction", "confidence", "severity", "conflict_explanation", "msa_exact_quote", "sow_exact_quote", "suggested_redline", "guardrail_verified", "guardrail_action", "category", "risk_score"}
     assert parsed_keys <= master_doc.keys()
     assert retrieval_keys <= retrieval[0].keys()
     assert prediction_keys <= predictions[0].keys()
+    assert isinstance(predictions[0]["category"], str)
+    assert isinstance(predictions[0]["risk_score"], float)
