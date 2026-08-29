@@ -88,7 +88,8 @@ _TEXT_DATE_RE = re.compile(
 )
 _DURATION_RE = re.compile(
     r"\b(?P<value>\d+(?:\.\d+)?|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|"
-    r"thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty|thirty|forty|fifty|sixty|ninety)\s+"
+    r"thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty|thirty|forty|fifty|sixty|ninety)"
+    r"(?:\s*\(\d+\))?\s+"
     r"(?P<unit>days?|months?|years?)\b",
     re.IGNORECASE,
 )
