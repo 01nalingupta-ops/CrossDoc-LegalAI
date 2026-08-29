@@ -15,6 +15,7 @@ from typing import Any, BinaryIO
 import auditor_guardrail
 import ingestion
 import matchmaker
+import numeric_reasoning
 from model_adapter import AuditorModelAdapter, LocalNLIAdapter, MockAdapter
 from pipeline_stubs import infer_category, sort_predictions_for_display
 
@@ -53,10 +54,14 @@ def run_auditor_and_guardrail(
     returned model identifier is owned by the active adapter.
     """
     adapter = get_auditor_adapter()
-    return [
-        auditor_guardrail.run_auditor_and_guardrail(result, master_full_text, service_full_text, adapter, pair_id)
-        for result in retrieval_results
-    ]
+    predictions: list[dict[str, Any]] = []
+    for result in retrieval_results:
+        prediction = auditor_guardrail.run_auditor_and_guardrail(
+            result, master_full_text, service_full_text, adapter, pair_id
+        )
+        prediction["numeric_evidence"] = numeric_reasoning.evidence_for_retrieval_result(result)
+        predictions.append(prediction)
+    return predictions
 
 
 def get_auditor_adapter() -> AuditorModelAdapter:
