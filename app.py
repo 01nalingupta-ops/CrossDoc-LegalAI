@@ -88,7 +88,7 @@ def render_results(report: dict) -> None:
 def render_prediction_card(prediction: dict) -> None:
     import streamlit as st
 
-    category = infer_category(prediction)
+    category = prediction.get("category", "Other")
     severity = prediction.get("severity", "None")
     with st.container(border=True):
         header_cols = st.columns([3, 1, 2])
