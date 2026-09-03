@@ -83,8 +83,11 @@ Returns `VerifiedPrediction` objects:
   "sow_exact_quote": "string",
   "suggested_redline": "string",
   "guardrail_verified": "boolean",
-  "guardrail_action": "passed | quote_rejected | claim_withheld"
+  "guardrail_action": "passed | quote_rejected | claim_withheld",
+  "numeric_evidence": "array, live-mode additive structured numeric evidence",
+  "category": "Payment Terms | Liability Cap | IP Ownership | Termination Notice | Governing Jurisdiction | Confidentiality Scope | Indemnification | Insurance Requirements | Other",
+  "risk_score": "float 0.0-100.0"
 }
 ```
 
-Live mode calls `auditor_guardrail.run_auditor_and_guardrail` for each retrieval result and every adapter output flows through `apply_guardrail(...)` unchanged. `LocalNLIAdapter` is configured in `auditor_config.json` with model name/revision, threshold, severity bands, and label aliases. Stub mode keeps its standalone deterministic auditor and substring guardrail so the offline UI still demonstrates both verified findings and `claim_withheld` safety behavior.
+Live mode calls `auditor_guardrail.run_auditor_and_guardrail` for each retrieval result and every adapter output flows through `apply_guardrail(...)` unchanged. After guardrail execution, live mode attaches additive `numeric_evidence`, a real clause `category` from `clause_classifier.py`, and a configured deterministic `risk_score` from `risk_scoring.py`. `LocalNLIAdapter` is configured in `auditor_config.json` with model name/revision, threshold, severity bands, and label aliases. Stub mode keeps its standalone deterministic auditor and substring guardrail so the offline UI still demonstrates both verified findings and `claim_withheld` safety behavior.

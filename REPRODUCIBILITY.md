@@ -56,7 +56,7 @@ python evaluation.py --ground-truth benchmark_dataset.json --predictions verifie
 python report_export.py --eval-results evaluation_results.json --seed <master-seed> --dataset-hash <sha256> --out-dir report_export
 ```
 
-Retrieval and auditor/guardrail are invoked through stable Python seams in `run_benchmark.py` and exchange `RetrievalResult` and `VerifiedPrediction` JSON-compatible records. The persisted combined prediction log is JSONL for auditability; evaluation loads those records directly in-process.
+Retrieval and auditor/guardrail are invoked through stable Python seams in `run_benchmark.py` and exchange `RetrievalResult` and `VerifiedPrediction` JSON-compatible records. The persisted combined prediction log is JSONL for auditability; evaluation loads those records directly in-process. Live `VerifiedPrediction` records may include additive `numeric_evidence`, `category`, and `risk_score` fields; risk scoring is deterministic and table-driven by `risk_scoring.DEFAULT_RISK_CONFIG`.
 
 ## What a publication release package should bundle
 

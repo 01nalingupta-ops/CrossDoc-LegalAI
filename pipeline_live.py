@@ -13,11 +13,13 @@ from pathlib import Path
 from typing import Any, BinaryIO
 
 import auditor_guardrail
+import clause_classifier
 import ingestion
 import matchmaker
 import numeric_reasoning
+import risk_scoring
 from model_adapter import AuditorModelAdapter, LocalNLIAdapter, MockAdapter
-from pipeline_stubs import infer_category, sort_predictions_for_display
+from pipeline_stubs import sort_predictions_for_display
 
 
 def parse_document(file: str | Path | bytes | BinaryIO, doc_type: str) -> dict[str, Any]:
@@ -59,9 +61,17 @@ def run_auditor_and_guardrail(
         prediction = auditor_guardrail.run_auditor_and_guardrail(
             result, master_full_text, service_full_text, adapter, pair_id
         )
+        category = infer_category(result["service_chunk_text"])
         prediction["numeric_evidence"] = numeric_reasoning.evidence_for_retrieval_result(result)
+        prediction["category"] = category
+        prediction["risk_score"] = risk_scoring.score_prediction(prediction, category)["risk_score"]
         predictions.append(prediction)
     return predictions
+
+
+def infer_category(text: str) -> str:
+    """Classify live clauses using the real Part 14 clause classifier."""
+    return clause_classifier.infer_category(text)
 
 
 def get_auditor_adapter() -> AuditorModelAdapter:
