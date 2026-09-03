@@ -169,6 +169,8 @@ def call_auditor_guardrail_module(
     import ingestion
     import auditor_guardrail
     import numeric_reasoning
+    import clause_classifier
+    import risk_scoring
     from model_adapter import MockAdapter
     from pipeline_live import get_auditor_adapter
 
@@ -188,6 +190,9 @@ def call_auditor_guardrail_module(
                 result, master_doc["full_text"], service_doc["full_text"], adapter, item["pair_id"]
             )
             chunk_prediction["numeric_evidence"] = numeric_reasoning.evidence_for_retrieval_result(result)
+            category = clause_classifier.infer_category(result["service_chunk_text"])
+            chunk_prediction["category"] = category
+            chunk_prediction["risk_score"] = risk_scoring.score_prediction(chunk_prediction, category)["risk_score"]
             chunk_predictions.append(chunk_prediction)
         best = _select_pair_prediction(chunk_predictions)
         best["model_id"] = model_slot
